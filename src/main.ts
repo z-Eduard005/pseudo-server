@@ -44,23 +44,21 @@ tryCatch(
     Tlauncher.launch();
 
     // server activation and choosing who will be the host
-    Hosting.ip = await Hosting.getServerIP();
-    Minecraft.addServerToMenu(Hosting.ip ? Hosting.ip : Zerotier.ip!);
+    await Hosting.getHostingStatus();
+    Minecraft.addServerToMenu(Hosting.status.ip ? Hosting.status.ip : Zerotier.ip!);
 
-    await Hosting.startContinuousMonitoring(
+    await Hosting.startMonitoring(
       () => {
-        return log(
-          `Someone is already playing, the server is running on IP - ${Hosting.ip}:${MC_PORT}\nJust connect :)`, 'success'
-        );
+        log(`Someone is already playing, the server is running on IP - ${Hosting.status.ip}:${MC_PORT}\nJust connect :)`, 'success');
       }, (newIP) => {
         log(
-          newIP
-            ? `Reconecting to new host on IP - ${Hosting.ip}:${MC_PORT}...`
-            : "Wait, now you will be the host..."
+          newIP === Zerotier.ip
+            ? "Wait, now you will be the host..."
+            : `Reconecting to new host on IP - ${newIP}:${MC_PORT}...`
           , "warning"
         );
-        Hosting.ip = newIP;
-        Minecraft.addServerToMenu(Hosting.ip ? Hosting.ip : Zerotier.ip!);
+        Hosting.status.ip = newIP;
+        Minecraft.addServerToMenu(Hosting.status.ip ? Hosting.status.ip : Zerotier.ip!);
       }
     );
 
@@ -80,16 +78,19 @@ tryCatch(
       throwErr(`Error starting Java server. Check path to Java, it should be like this: ${JDK.FILE}\n${err}`);
     });
     JDK.process?.on("close", async (code) => {
-      if (code !== 0) { throwErr(`Server terminated with an error (code: ${code})`); }
+      if (code !== 0) {
+        throwErr(`Server terminated with an error (code: ${code})`);
+      }
       await Process.stop("Server successfully stopped");
     });
     JDK.process?.stdout.on("data", async (data) => {
-      const output = Process.protectOutput(data);
-      process.stdout.write(output);
+      process.stdout.write(data);
 
-      if (output.includes(`${ADMIN_NAME} joined the game`)) { JDK.runMCCommand(`op ${ADMIN_NAME}`); }
+      if (data.includes(`${ADMIN_NAME} joined the game`)) {
+        JDK.runMCCommand(`op ${ADMIN_NAME}`);
+      }
 
-      if (output.includes("Unloading dimension 1")) {
+      if (data.includes("Unloading dimension 1")) {
         log(`You have started the server on port: ${Zerotier.ip}:${MC_PORT}\nHave fun playing :)`, "success");
 
         // world synchronization every 30 minutes
@@ -98,7 +99,7 @@ tryCatch(
     });
   },
   async (err) => {
-    Process.logTopLevelError(err);
+    log(err, "error");
     await Process.stop();
   }
 );

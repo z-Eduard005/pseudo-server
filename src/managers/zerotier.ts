@@ -1,9 +1,11 @@
 import { spawn } from "child_process";
-import { DEFAULT_START_ZT_IP, IS_WIN32, USER_NAME, ZT_NETWORK_ID } from "../constants";
+import { DEFAULT_START_ZT_IP, IS_WIN32, USER_NAME } from "../constants";
 import { exists, retryRun, run, log, sudo, throwErr, tryCatch } from "../utils"
 import { setTimeout as setTimeoutPromise } from "timers/promises";
 import { join } from "path";
 import { networkInterfaces, tmpdir } from "os";
+
+const ZT_NETWORK_ID = "TEST"
 
 export default class Zerotier {
   private static readonly FILE = IS_WIN32
@@ -26,13 +28,15 @@ export default class Zerotier {
 
   private static async setupSudoers() {
     log("Setting up sudo privileges for Zerotier...", "info")
-    await tryCatch(() => { return retryRun(() => {
+    await tryCatch(() => {
+      return retryRun(() => {
         return run([
           sudo(`sh -c 'echo "${Zerotier.SUDOERS_CONTENT}" > "${Zerotier.SUDOERS_FILE}"'`),
           sudo(`chmod 440 "${Zerotier.SUDOERS_FILE}"`)
         ]);
       }
-    ); }, "Error setting up sudo privileges for Zerotier");
+      );
+    }, "Error setting up sudo privileges for Zerotier");
   }
 
   static async start() {
@@ -70,10 +74,12 @@ export default class Zerotier {
   }
 
   static async leaveNetwork() {
-    await tryCatch(() => { return run(
-      sudo(`"${Zerotier.FILE}" leave ${ZT_NETWORK_ID}`),
-      { inherit: true }
-    ); }, "Failed to leave zerotier network", true)
+    await tryCatch(() => {
+      return run(
+        sudo(`"${Zerotier.FILE}" leave ${ZT_NETWORK_ID}`),
+        { inherit: true }
+      );
+    }, "Failed to leave zerotier network", true)
   }
 
   static getIP() {

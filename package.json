@@ -5,13 +5,19 @@
   "license": "ISC",
   "description": "A decentralized Minecraft server provisioning program. No dedicated host required — first to run becomes host, others auto-join.",
   "scripts": {
-    "build": "tsup src/main.ts --format cjs --target node18 --out-dir build --treeshake --minify && javascript-obfuscator build --output build --dead-code-injection true --string-array true --split-strings true && pkg build/main.js -o build/Gregicality-Server.exe -t node18-win-x64 && pkg build/main.js -o build/Gregicality-Server -t node18-linux-x64 && chmod +x build/Gregicality-Server"
+    "vercel-handle": "tsup src/vercel.ts --format esm --out-dir vercel --treeshake --minify && tar -cf vercel.tar vercel/ && rm vercel/vercel.mjs",
+    "ts-handle": "tsup src/main.ts --format cjs --target node18 --out-dir build --treeshake --minify",
+    "pkg-handle": "pkg build/main.js -o build/Pseudo-Server.exe -t node18-win-x64 && pkg build/main.js -o build/Pseudo-Server -t node18-linux-x64 && chmod +x build/Pseudo-Server",
+    "build": "npm run vercel-handle && npm run ts-handle && npm run pkg-handle"
   },
   "devDependencies": {
+    "express": "^5.2.1",
+    "@types/express": "^5.0.6",
+    "@upstash/redis": "^1.38.0",
+    "@vercel/functions": "^3.6.3",
     "@types/node": "^22.13.10",
     "eslint": "^9.34.0",
     "globals": "^16.3.0",
-    "javascript-obfuscator": "^4.1.1",
     "jiti": "^2.5.1",
     "pkg": "^5.8.1",
     "tsup": "^8.4.0",

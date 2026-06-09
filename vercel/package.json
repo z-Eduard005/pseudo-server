@@ -1,0 +1,11 @@
+{
+  "name": "pseudo-server-status",
+  "version": "0.0.0",
+  "description": "KV keep-alive endpoint for pseudo-server",
+  "type": "module",
+  "dependencies": {
+    "@upstash/redis": "^1.38.0",
+    "@vercel/functions": "^1.5.2",
+    "express": "^4.21.2"
+  }
+}

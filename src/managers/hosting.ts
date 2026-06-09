@@ -7,12 +7,14 @@ import Zerotier from "./zerotier";
 
 type ServerStatus = {
   ip: string | null;
+  lastUpdateTime: number | null;
   err: string | null;
 };
 
 export default class Hosting {
   private static readonly URL = "https://server-status-iota.vercel.app/";
   private static readonly ACTIVATE_INTERVAL_MS = 25 * 1000;
+  private static readonly STALE_MS = 35 * 1000;
   private static readonly ACTIVATION_LIMIT = 5 * 60 * 1000 / Hosting.ACTIVATE_INTERVAL_MS;
   private static readonly MC_LOG_FILE = join(CUSTOM_VERSION_DIR, "logs", "latest.log");
   private static readonly MC_LOG_EVENTS = [
@@ -26,39 +28,41 @@ export default class Hosting {
     "] [Session-Validator/INFO] [ReAuth]: Session validation successful",
   ];
 
-  static ip: ServerStatus["ip"] = null;
-
+  static status: ServerStatus = { ip: null, lastUpdateTime: null, err: null };
+  private static someonePlaing = false;
   private static _nodePushInterval: NodeJS.Timeout;
 
   static get nodePushInterval() {
     return this._nodePushInterval;
   }
 
-  private static async fetchServerStatus(endpoint: "activate"): Promise<NonNullable<ServerStatus>> {
-    return retryRun(async () => {
-      const res = await fetch(Hosting.URL + endpoint, {
-        method: "POST",
-        headers: {
-          "x-api-password": SERVER_STATUS_PASS,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ipv4: Zerotier.ip }),
-      });
-      return res.json();
-    });
-  }
-
   private static async activateServer() {
     return await tryCatch(async () => {
-      const result = await Hosting.fetchServerStatus("activate");
-      if (result.ip) {
-        return result;
-      }
+      const result = await retryRun(async () => {
+        const res = await fetch(Hosting.URL + "activate", {
+          method: "POST",
+          headers: {
+            "x-api-password": "TEST",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ipv4: Zerotier.ip }),
+        });
+        return await res.json() as ServerStatus;
+      });
       if (result.err) {
         throwErr(result.err);
       }
-      return { ip: null, err: null };
+      return result;
     }, `Server connection error (check your internet)\nNext launch possible in ${Hosting.ACTIVATE_INTERVAL_MS / 1000 + 10} seconds`);
+  }
+
+  private static async getStatus() {
+    return retryRun(async () => {
+      const res = await fetch(Hosting.URL + "get", {
+        headers: { "x-api-password": "TEST" },
+      });
+      return await res.json() as ServerStatus;
+    });
   }
 
   private static async isUserConnected() {
@@ -71,7 +75,7 @@ export default class Hosting {
               : "lsof -iTCP -sTCP:ESTABLISHED -n -P | grep javaw | xargs -r"
           );
         });
-        return netstat.includes(`${Hosting.ip}:${MC_PORT}`);
+        return netstat.includes(`${Hosting.status.ip}:${MC_PORT}`);
       },
       "Error checking user connection to minecraft server"
     );
@@ -113,19 +117,25 @@ export default class Hosting {
     }
   }
 
-  static async getServerIP() {
-    return (await Hosting.activateServer()).ip;
+  static async getHostingStatus() {
+    return await tryCatch(async () => {
+      const result = await Hosting.getStatus();
+      if (result.err) {
+        throwErr(result.err);
+      }
+      Hosting.status = result;
+    }, "Error checking server status");
   }
 
-  static async startContinuousMonitoring(whenHostExists: () => void, whenHostLeaves: (newIP: ServerStatus["ip"]) => void) {
+  static async startMonitoring(whenHostExists: () => void, whenHostLeaves: (newIP: ServerStatus["ip"]) => void) {
+    Hosting.someonePlaing = true;
     for (
       const loopState = {
         firstLoop: true,
         activationAtts: 0,
         lastLineIndex: 0,
       };
-      Hosting.ip;
-
+      Hosting.someonePlaing;
     ) {
       if (loopState.firstLoop) {
         whenHostExists();
@@ -150,9 +160,16 @@ export default class Hosting {
       if (await Hosting.shouldCheckHost(loopState.activationAtts)) {
         loopState.activationAtts++;
 
-        const newIP = await Hosting.getServerIP();
-        if (newIP !== Hosting.ip) {
-          whenHostLeaves(newIP);
+        Hosting.status = await Hosting.getStatus();
+
+        if (
+          Hosting.status.lastUpdateTime &&
+          Date.now() - Hosting.status.lastUpdateTime > Hosting.STALE_MS
+        ) {
+          Hosting.someonePlaing = false;
+          whenHostLeaves(Zerotier.ip);
+        } else if (Hosting.status.ip !== Zerotier.ip) {
+          whenHostLeaves(Hosting.status.ip);
         }
       }
     }
