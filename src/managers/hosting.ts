@@ -1,5 +1,5 @@
 import { join } from "path";
-import { DEFAULT_START_ZT_IP, CUSTOM_VERSION_DIR, IS_WIN32, MC_PORT, SERVER_NAME } from "../constants";
+import { DEFAULT_START_ZT_IP, CUSTOM_VERSION_DIR, IS_WIN32, MC_PORT, SERVER_NAME, VERCEL_API_PASS, HOSTING_STALE_MS } from "../constants";
 import { exists, log, retryRun, run, throwErr, tryCatch } from "../utils";
 import { readFile, rename } from "fs/promises";
 import { setTimeout as setTimeoutPromise } from "timers/promises";
@@ -14,7 +14,6 @@ type ServerStatus = {
 export default class Hosting {
   private static readonly URL = "https://server-status-iota.vercel.app/";
   private static readonly ACTIVATE_INTERVAL_MS = 25 * 1000;
-  private static readonly STALE_MS = 35 * 1000;
   private static readonly ACTIVATION_LIMIT = 5 * 60 * 1000 / Hosting.ACTIVATE_INTERVAL_MS;
   private static readonly MC_LOG_FILE = join(CUSTOM_VERSION_DIR, "logs", "latest.log");
   private static readonly MC_LOG_EVENTS = [
@@ -42,7 +41,7 @@ export default class Hosting {
         const res = await fetch(Hosting.URL + "activate", {
           method: "POST",
           headers: {
-            "x-api-password": "TEST",
+            "x-api-password": VERCEL_API_PASS,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ ipv4: Zerotier.ip }),
@@ -59,7 +58,7 @@ export default class Hosting {
   private static async getStatus() {
     return retryRun(async () => {
       const res = await fetch(Hosting.URL + "get", {
-        headers: { "x-api-password": "TEST" },
+        headers: { "x-api-password": VERCEL_API_PASS },
       });
       return await res.json() as ServerStatus;
     });
@@ -164,7 +163,7 @@ export default class Hosting {
 
         if (
           Hosting.status.lastUpdateTime &&
-          Date.now() - Hosting.status.lastUpdateTime > Hosting.STALE_MS
+          Date.now() - Hosting.status.lastUpdateTime > HOSTING_STALE_MS
         ) {
           Hosting.someonePlaing = false;
           whenHostLeaves(Zerotier.ip);
