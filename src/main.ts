@@ -40,7 +40,7 @@ tryCatch(
     Tlauncher.launch();
 
     // choosing who will be the host
-    Hosting.start();
+    await Hosting.startMonitoring();
 
     // initialization of the world
     await World.init();
