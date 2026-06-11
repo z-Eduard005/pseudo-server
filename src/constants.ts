@@ -73,7 +73,4 @@ export const SHORTCUT_FILE = join(CUSTOM_VERSION_DIR, SHORTCUT_FILENAME);
 
 export const WINGET_PACKAGES = ["AdoptOpenJDK.OpenJDK.8", "Git.Git"];
 
-export const DEFAULT_START_ZT_IP = "10.242";
-export const BROADCAST_ZT_IP = `${DEFAULT_START_ZT_IP}.255.255`;
-
 export const CONFIG_FILE = join(CUSTOM_VERSION_DIR, "config.json");

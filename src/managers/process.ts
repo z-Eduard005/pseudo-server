@@ -70,7 +70,7 @@ export default class Process {
     World.disableRepeatedPush();
     await JDK.kill();
 
-    if (Hosting.status.ip === Zerotier.ip && World.initialized) {
+    if (Hosting.ip === Zerotier.ip && World.initialized) {
       await tryCatch(
         () => {
           return World.sync();

@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { DEFAULT_START_ZT_IP, IS_WIN32, USER_NAME } from "../constants";
+import { IS_WIN32, USER_NAME } from "../constants";
 import { exists, retryRun, run, log, sudo, throwErr, tryCatch } from "../utils"
 import { setTimeout as setTimeoutPromise } from "timers/promises";
 import { join } from "path";
@@ -20,6 +20,7 @@ export default class Zerotier {
   private static readonly SUDOERS_CONTENT = `${USER_NAME} ALL=(ALL) NOPASSWD: ${Zerotier.FILE} *`;
   private static readonly CMD_TIMEOUT = 4000;
 
+  static readonly START_IP = "10.242";
   private static _ip: string | null = null
 
   static get ip() {
@@ -90,7 +91,7 @@ export default class Zerotier {
           (interf) => {
             return interf?.family === "IPv4" &&
               !interf.internal &&
-              interf.address.startsWith(DEFAULT_START_ZT_IP);
+              interf.address.startsWith(Zerotier.START_IP);
           }
         )?.address ?? "";
     if (!Zerotier._ip)
