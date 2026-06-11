@@ -1,176 +1,124 @@
-import { join } from "path";
-import { DEFAULT_START_ZT_IP, CUSTOM_VERSION_DIR, IS_WIN32, MC_PORT, SERVER_NAME, VERCEL_API_PASS, HOSTING_STALE_MS } from "../constants";
-import { exists, log, retryRun, run, throwErr, tryCatch } from "../utils";
-import { readFile, rename } from "fs/promises";
-import { setTimeout as setTimeoutPromise } from "timers/promises";
+import dgram from "dgram";
+import { BROADCAST_ZT_IP, MC_PORT } from "../constants";
+import { log, tryCatch } from "../utils";
 import Zerotier from "./zerotier";
+import Minecraft from "./minecraft";
 
-type ServerStatus = {
-  ip: string | null;
-  lastUpdateTime: number | null;
-  err: string | null;
-};
+const BROADCAST_PORT = 42069;
 
 export default class Hosting {
-  private static readonly URL = "https://server-status-iota.vercel.app/";
-  private static readonly ACTIVATE_INTERVAL_MS = 25 * 1000;
-  private static readonly ACTIVATION_LIMIT = 5 * 60 * 1000 / Hosting.ACTIVATE_INTERVAL_MS;
-  private static readonly MC_LOG_FILE = join(CUSTOM_VERSION_DIR, "logs", "latest.log");
-  private static readonly MC_LOG_EVENTS = [
-    // mc client loaded
-    "] [Client thread/INFO] [FML]: Forge Mod Loader has successfully loaded",
-    // trying to connect to the server
-    `] [Client thread/INFO] [net.minecraft.client.multiplayer.GuiConnecting]: Connecting to ${DEFAULT_START_ZT_IP}`,
-    // server closed
-    "] [Client thread/INFO] [FML]: Holder lookups applied",
-    // pressed multiplayer button first time
-    "] [Session-Validator/INFO] [ReAuth]: Session validation successful",
-  ];
+  static status: { ip: string | null } = { ip: null };
 
-  static status: ServerStatus = { ip: null, lastUpdateTime: null, err: null };
-  private static someonePlaing = false;
-  private static _nodePushInterval: NodeJS.Timeout;
+  private static readonly DISCOVER_MS = 5_000;
+  private static readonly BEAT_MS = 3_000;
+  private static readonly TIMEOUT_MS = 30_000;
 
-  static get nodePushInterval() {
-    return this._nodePushInterval;
-  }
+  private static socket: dgram.Socket | null = null;
+  private static beatTimer: NodeJS.Timeout | null = null;
+  private static discTimer: NodeJS.Timeout | null = null;
+  private static liveTimer: NodeJS.Timeout | null = null;
+  private static lastBeat = 0;
+  private static found = false;
 
-  private static async activateServer() {
-    return await tryCatch(async () => {
-      const result = await retryRun(async () => {
-        const res = await fetch(Hosting.URL + "activate", {
-          method: "POST",
-          headers: {
-            "x-api-password": VERCEL_API_PASS,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ipv4: Zerotier.ip }),
-        });
-        return await res.json() as ServerStatus;
-      });
-      if (result.err) {
-        throwErr(result.err);
-      }
-      return result;
-    }, `Server connection error (check your internet)\nNext launch possible in ${Hosting.ACTIVATE_INTERVAL_MS / 1000 + 10} seconds`);
-  }
+  static start() {
+    Minecraft.addServerToMenu(Hosting.status.ip ? Hosting.status.ip : Zerotier.ip!);
 
-  private static async getStatus() {
-    return retryRun(async () => {
-      const res = await fetch(Hosting.URL + "get", {
-        headers: { "x-api-password": VERCEL_API_PASS },
-      });
-      return await res.json() as ServerStatus;
+    Hosting.found = false;
+
+    const sock = dgram.createSocket("udp4");
+    sock.on("message", (data) => {
+      tryCatch(() => {
+        const msg = JSON.parse(data.toString()) as { type: string; ip: string };
+        if (msg.ip === Zerotier.ip) return;
+        Hosting.onBeat(msg.ip);
+      }, undefined, true);
     });
+    tryCatch(() => sock.bind(BROADCAST_PORT), `Can't bind UDP ${BROADCAST_PORT}`);
+    Hosting.socket = sock;
+
+    Hosting.send({ type: "PING", ip: Zerotier.ip! });
+
+    Hosting.discTimer = setTimeout(() => {
+      if (!Hosting.found) Hosting.claim();
+    }, Hosting.DISCOVER_MS);
+
+    Hosting.liveTimer = setInterval(() => {
+      if (
+        Hosting.found &&
+        Hosting.status.ip !== Zerotier.ip &&
+        Date.now() - Hosting.lastBeat > Hosting.TIMEOUT_MS
+      ) {
+        Hosting.claim();
+      }
+    }, 10_000);
   }
 
-  private static async isUserConnected() {
-    return await tryCatch(
-      async () => {
-        const netstat = await retryRun(() => {
-          return run(
-            IS_WIN32
-              ? "netstat -ano | findstr ESTABLISHED 2>nul"
-              : "lsof -iTCP -sTCP:ESTABLISHED -n -P | grep javaw | xargs -r"
-          );
-        });
-        return netstat.includes(`${Hosting.status.ip}:${MC_PORT}`);
-      },
-      "Error checking user connection to minecraft server"
-    );
-  }
-
-  private static hasRecentActivity(lines: string[], lastLineIndex: number) {
-    return Hosting.MC_LOG_EVENTS.some((e) => {
-      return lines.slice(lastLineIndex).join("").includes(e);
-    })
-  }
-
-  private static async shouldCheckHost(activationAtts: number) {
-    return activationAtts < Hosting.ACTIVATION_LIMIT && !(await Hosting.isUserConnected())
-  }
-
-  static async enableKeepAlive() {
-    const err = (await Hosting.activateServer()).err;
-    if (err) {
-      throwErr(err);
-    }
-
-    log("Start of the hosting...", "info")
-    Hosting._nodePushInterval = setInterval(Hosting.activateServer, Hosting.ACTIVATE_INTERVAL_MS);
+  static enableKeepAlive() {
+    if (Hosting.beatTimer) return;
+    Hosting.beatTimer = setInterval(() => {
+      Hosting.send({ type: "HEARTBEAT", ip: Zerotier.ip! });
+    }, Hosting.BEAT_MS);
   }
 
   static disableKeepAlive() {
-    clearInterval(Hosting._nodePushInterval)
+    if (Hosting.beatTimer) { clearInterval(Hosting.beatTimer); Hosting.beatTimer = null; }
   }
 
-  static async resetMCLog() {
-    if (await exists(Hosting.MC_LOG_FILE)) {
-      await tryCatch(() => {
-        return rename(
-          Hosting.MC_LOG_FILE,
-          join(Hosting.MC_LOG_FILE, "..", `before-${SERVER_NAME}-${Date.now()}.log`)
-        );
-      }, "Error while reseting mc log file"
-      )
+  static stop() {
+    Hosting.disableKeepAlive();
+    if (Hosting.discTimer) { clearTimeout(Hosting.discTimer); Hosting.discTimer = null; }
+    if (Hosting.liveTimer) { clearInterval(Hosting.liveTimer); Hosting.liveTimer = null; }
+    Hosting.socket?.close();
+    Hosting.socket = null;
+  }
+
+  private static onBeat(ip: string) {
+    Hosting.lastBeat = Date.now();
+
+    if (!Hosting.found) {
+      Hosting.found = true;
+      if (Hosting.discTimer) { clearTimeout(Hosting.discTimer); Hosting.discTimer = null; }
+      Hosting.status.ip = ip;
+      log(`Someone is already playing, the server is running on IP - ${ip}:${MC_PORT}\nJust connect :)`, "success");
+      return;
+    }
+
+    if (Hosting.status.ip === ip) return;
+
+    if (Hosting.status.ip === Zerotier.ip) {
+      if (ip < Zerotier.ip!) {
+        Hosting.status.ip = ip;
+        Hosting.disableKeepAlive();
+        Hosting.notifyChange(ip);
+      }
+    } else {
+      Hosting.status.ip = ip;
+      Hosting.notifyChange(ip);
     }
   }
 
-  static async getHostingStatus() {
-    return await tryCatch(async () => {
-      const result = await Hosting.getStatus();
-      if (result.err) {
-        throwErr(result.err);
-      }
-      Hosting.status = result;
-    }, "Error checking server status");
+  private static claim() {
+    Hosting.status.ip = Zerotier.ip!;
+    Hosting.found = true;
+    Hosting.enableKeepAlive();
+    Hosting.send({ type: "HEARTBEAT", ip: Zerotier.ip! });
+    Hosting.notifyChange(Zerotier.ip!);
   }
 
-  static async startMonitoring(whenHostExists: () => void, whenHostLeaves: (newIP: ServerStatus["ip"]) => void) {
-    Hosting.someonePlaing = true;
-    for (
-      const loopState = {
-        firstLoop: true,
-        activationAtts: 0,
-        lastLineIndex: 0,
-      };
-      Hosting.someonePlaing;
-    ) {
-      if (loopState.firstLoop) {
-        whenHostExists();
-        loopState.firstLoop = false;
-      }
-      await setTimeoutPromise(Hosting.ACTIVATE_INTERVAL_MS);
+  private static notifyChange(ip: string) {
+    log(
+      ip === Zerotier.ip
+        ? "Wait, now you will be the host..."
+        : `Reconecting to new host on IP - ${ip}:${MC_PORT}...`,
+      "warning",
+    );
+    Minecraft.addServerToMenu(Hosting.status.ip ? Hosting.status.ip : Zerotier.ip!);
+  }
 
-      const mcLog = await tryCatch(() => {
-        return readFile(Hosting.MC_LOG_FILE, "utf8");
-      });
-      if (!mcLog) {
-        continue;
-      }
-
-      const mcLogLines = mcLog.split("\n");
-      if (Hosting.hasRecentActivity(mcLogLines, loopState.lastLineIndex)) {
-        loopState.activationAtts = 0;
-      }
-
-      loopState.lastLineIndex = mcLogLines.length;
-
-      if (await Hosting.shouldCheckHost(loopState.activationAtts)) {
-        loopState.activationAtts++;
-
-        Hosting.status = await Hosting.getStatus();
-
-        if (
-          Hosting.status.lastUpdateTime &&
-          Date.now() - Hosting.status.lastUpdateTime > HOSTING_STALE_MS
-        ) {
-          Hosting.someonePlaing = false;
-          whenHostLeaves(Zerotier.ip);
-        } else if (Hosting.status.ip !== Zerotier.ip) {
-          whenHostLeaves(Hosting.status.ip);
-        }
-      }
-    }
+  private static send(msg: object) {
+    const data = Buffer.from(JSON.stringify(msg));
+    tryCatch(() => {
+      Hosting.socket?.send(data, BROADCAST_PORT, BROADCAST_ZT_IP);
+    }, undefined, true);
   }
 }

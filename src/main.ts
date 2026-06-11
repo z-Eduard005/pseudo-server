@@ -4,7 +4,6 @@ import Zerotier from "./managers/zerotier";
 import World from "./managers/world";
 import JDK from "./managers/jdk";
 import Tlauncher from "./managers/tlauncher";
-import Minecraft from "./managers/minecraft";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
 import App from "./managers/app";
@@ -37,32 +36,11 @@ tryCatch(
     await Tlauncher.initSettings();
     await Tlauncher.chooseCustomVersion();
 
-    // reset latest mc log
-    await Hosting.resetMCLog();
-
     // launching tlauncher
     Tlauncher.launch();
 
-    // server activation and choosing who will be the host
-    await Hosting.getHostingStatus();
-    Minecraft.addServerToMenu(Hosting.status.ip ? Hosting.status.ip : Zerotier.ip!);
-
-    await Hosting.startMonitoring(
-      () => {
-        log(`Someone is already playing, the server is running on IP - ${Hosting.status.ip}:${MC_PORT}\nJust connect :)`, 'success');
-      }, (newIP) => {
-        log(
-          newIP === Zerotier.ip
-            ? "Wait, now you will be the host..."
-            : `Reconecting to new host on IP - ${newIP}:${MC_PORT}...`
-          , "warning"
-        );
-        Hosting.status.ip = newIP;
-        Minecraft.addServerToMenu(Hosting.status.ip ? Hosting.status.ip : Zerotier.ip!);
-      }
-    );
-
-    await Hosting.enableKeepAlive();
+    // choosing who will be the host
+    Hosting.start();
 
     // initialization of the world
     await World.init();

@@ -4,10 +4,12 @@ import { USER_NAME, SERVER_DIR } from "../constants";
 import JDK from "./jdk";
 import { join } from "path";
 
+
 export default class World {
   private static readonly PUSH_INTERVAL_MS = 30 * 60 * 1000;
   private static readonly MC_FUNC_CHAT_SYNC_NAME = "-s:chat-w-sync";
   private static readonly DIR = join(SERVER_DIR, "world");
+  private static readonly REPO_URL = "TEST"
 
   private static _initialized = false;
   private static _nodePushInterval: NodeJS.Timeout;
