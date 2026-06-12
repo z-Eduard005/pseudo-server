@@ -1,5 +1,5 @@
 import { createSocket, type Socket } from "dgram";
-import { log } from "../utils";
+import { log, throwErr, tryCatch } from "../utils";
 import Zerotier from "./zerotier";
 import JDK from "./jdk";
 
@@ -8,70 +8,98 @@ type BroadcastData = { type: string; ip: string }
 export default class Hosting {
   private static readonly BROADCAST_PORT = 42069;
   private static readonly BROADCAST_IP = `${Zerotier.START_IP}.255.255`;
-  static ip: string | null = null;
-
+  private static readonly LISTEN_TIMEOUT = 5_000;
+  private static readonly HEARTBEAT_INTERVAL = 3_000;
+  private static readonly CONFIRM_TIMEOUT = 1_000;
+  private static readonly STALE_TIMEOUT = 20_000;
   private static socket: Socket;
   private static heartBeatTimer: NodeJS.Timeout | undefined;
+  private static staleTimer: NodeJS.Timeout | undefined;
+  private static confirmTimer: NodeJS.Timeout | undefined;
+  private static hostFound = false;
+  private static resolve: () => void;
+  private static _ip: string | null = null
+
+  static get ip() {
+    return this._ip;
+  }
 
   static startMonitoring(): Promise<void> {
-    return new Promise((resolve) => {
-      let hostFound = false;
-      let staleTimer: NodeJS.Timeout | undefined;
-      let confirmTimer: NodeJS.Timeout | undefined;
-
-      const becomeHost = () => {
-        if (Hosting.ip === Zerotier.ip) return;
-
-        Hosting.ip = Zerotier.ip;
-
-        clearInterval(Hosting.heartBeatTimer);
-        Hosting.heartBeatTimer = setInterval(() => {
-          const data = Buffer.from(JSON.stringify({ type: "HEARTBEAT", ip: Zerotier.ip }));
-          Hosting.socket.send(data, Hosting.BROADCAST_PORT, Hosting.BROADCAST_IP);
-        }, 3_000);
-
-        log("Wait, now you will be the host...", "warning");
-
-        confirmTimer = setTimeout(() => {
-          resolve();
-        }, 1_000);
-      };
-
-      const resetStale = () => {
-        clearTimeout(staleTimer);
-        staleTimer = setTimeout(becomeHost, 20_000);
-      };
+    return new Promise(async (resolve) => {
+      Hosting.resolve = resolve;
+      Hosting.hostFound = false;
 
       Hosting.socket = createSocket("udp4");
+      Hosting.socket.on("error", (err) => {
+        throwErr(`Zerotier Socket error (check your connection): ${err.message}`);
+      });
+
       Hosting.socket.on("message", (data) => {
         const msg = JSON.parse(data.toString()) as BroadcastData;
         if (msg.ip === Zerotier.ip) return;
 
-        if (!hostFound) {
-          hostFound = true;
-          Hosting.ip = msg.ip;
-          log(`Someone is already playing, server on ${msg.ip}:${JDK.PORT}`, "success");
-          resetStale();
+        if (!Hosting.hostFound) {
+          Hosting.hostFound = true;
+          Hosting._ip = msg.ip;
+          log(`Someone is already playing on ${msg.ip}:${JDK.PORT}`, "info");
+          Hosting.continueMonitoring();
         } else if (Hosting.ip === msg.ip) {
-          resetStale();
+          Hosting.continueMonitoring();
         } else if (Hosting.ip === Zerotier.ip && msg.ip < Zerotier.ip!) {
           clearInterval(Hosting.heartBeatTimer);
-          clearTimeout(confirmTimer);
-          Hosting.ip = msg.ip;
-          log(`Host with lower IP found, server on ${msg.ip}:${JDK.PORT}`, "success");
-          resetStale();
+          clearTimeout(Hosting.confirmTimer);
+          Hosting._ip = msg.ip;
+          log(`Reconecting to new host on ${msg.ip}:${JDK.PORT}`, "info");
+          Hosting.continueMonitoring();
         }
       });
-      Hosting.socket.bind(Hosting.BROADCAST_PORT);
+
+      await tryCatch(
+        () => Hosting.socket.bind(Hosting.BROADCAST_PORT),
+        `Port ${Hosting.BROADCAST_PORT} is already in use by ${Hosting.getPortOwner() || "another process"}. Close it and try again.`
+      );
 
       setTimeout(() => {
-        if (hostFound) return;
-        becomeHost();
-      }, 5_000);
+        if (Hosting.hostFound) return;
+        Hosting.becomeHost();
+      }, Hosting.LISTEN_TIMEOUT);
     });
+  }
+
+  private static becomeHost() {
+    if (Hosting.ip === Zerotier.ip) return;
+
+    Hosting._ip = Zerotier.ip;
+
+    clearInterval(Hosting.heartBeatTimer);
+    Hosting.heartBeatTimer = setInterval(async () => {
+      await tryCatch(
+        () => Hosting.socket.send(
+          Buffer.from(JSON.stringify({ type: "HEARTBEAT", ip: Zerotier.ip })),
+          Hosting.BROADCAST_PORT,
+          Hosting.BROADCAST_IP
+        ),
+        "Hosting connection error (check your connection)"
+
+      );
+    }, Hosting.HEARTBEAT_INTERVAL);
+
+    Hosting.confirmTimer = setTimeout(() => {
+      log("Wait, you will be the host...", "info");
+      Hosting.resolve();
+    }, Hosting.CONFIRM_TIMEOUT);
+  }
+
+  private static continueMonitoring() {
+    clearTimeout(Hosting.staleTimer);
+    Hosting.staleTimer = setTimeout(Hosting.becomeHost, Hosting.STALE_TIMEOUT);
   }
 
   static disableKeepAlive() {
     clearInterval(Hosting.heartBeatTimer);
+  }
+
+  private static getPortOwner(): string | null {
+    return null;
   }
 }
