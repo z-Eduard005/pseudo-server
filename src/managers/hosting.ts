@@ -1,7 +1,7 @@
 import { createSocket, type Socket } from "dgram";
-import { MC_PORT } from "../constants";
 import { log } from "../utils";
 import Zerotier from "./zerotier";
+import JDK from "./jdk";
 
 type BroadcastData = { type: string; ip: string }
 
@@ -17,6 +17,7 @@ export default class Hosting {
     return new Promise((resolve) => {
       let hostFound = false;
       let staleTimer: NodeJS.Timeout | undefined;
+      let confirmTimer: NodeJS.Timeout | undefined;
 
       const becomeHost = () => {
         if (Hosting.ip === Zerotier.ip) return;
@@ -30,7 +31,10 @@ export default class Hosting {
         }, 3_000);
 
         log("Wait, now you will be the host...", "warning");
-        resolve();
+
+        confirmTimer = setTimeout(() => {
+          resolve();
+        }, 1_000);
       };
 
       const resetStale = () => {
@@ -46,9 +50,15 @@ export default class Hosting {
         if (!hostFound) {
           hostFound = true;
           Hosting.ip = msg.ip;
-          log(`Someone is already playing, server on ${msg.ip}:${MC_PORT}`, "success");
+          log(`Someone is already playing, server on ${msg.ip}:${JDK.PORT}`, "success");
           resetStale();
         } else if (Hosting.ip === msg.ip) {
+          resetStale();
+        } else if (Hosting.ip === Zerotier.ip && msg.ip < Zerotier.ip!) {
+          clearInterval(Hosting.heartBeatTimer);
+          clearTimeout(confirmTimer);
+          Hosting.ip = msg.ip;
+          log(`Host with lower IP found, server on ${msg.ip}:${JDK.PORT}`, "success");
           resetStale();
         }
       });

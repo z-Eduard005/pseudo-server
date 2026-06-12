@@ -1,4 +1,4 @@
-import { MC_PORT, ADMIN_NAME } from "./constants";
+import { ADMIN_NAME } from "./constants";
 import { log, tryCatch, throwErr } from "./utils";
 import Zerotier from "./managers/zerotier";
 import World from "./managers/world";
@@ -69,7 +69,7 @@ tryCatch(
       }
 
       if (data.includes("Unloading dimension 1")) {
-        log(`You have started the server on port: ${Zerotier.ip}:${MC_PORT}\nHave fun playing :)`, "success");
+        log(`You have started the server on port: ${Zerotier.ip}:${JDK.PORT}\nHave fun playing :)`, "success");
 
         // world synchronization every 30 minutes
         World.enableRepeatedPush();

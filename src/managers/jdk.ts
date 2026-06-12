@@ -3,7 +3,7 @@ import type { ChildProcessByStdio } from "child_process";
 import { Stream } from "stream";
 import { exists, retryRun, run, log, sudo, throwErr, tryCatch } from "../utils";
 import { join } from "path";
-import { IS_WIN32, MC_PORT, SERVER_DIR, SERVER_NAME } from "../constants";
+import { IS_WIN32, SERVER_DIR, SERVER_NAME } from "../constants";
 import { writeFile } from "fs/promises";
 import { totalmem } from "os";
 
@@ -21,6 +21,7 @@ export default class JDK {
   private static readonly MIN_RAM_MB = 2700;
   private static readonly MAX_RAM_MB = 7168;
   private static readonly MAX_RAM_PERCENTAGE = 0.4;
+  static readonly PORT = "25565";
   private static _ram = JDK.MIN_RAM_MB;
   private static _process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 
@@ -150,7 +151,7 @@ max-players=10
 network-compression-threshold=256
 resource-pack-sha1=
 max-world-size=29999984
-server-port=${MC_PORT}
+server-port=${JDK.PORT}
 server-ip=
 spawn-npcs=true
 allow-flight=true

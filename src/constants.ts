@@ -12,8 +12,6 @@ export const CUSTOM_VERSION = "GTmodpack";
 export const SHORTCUT_FILENAME = `${SERVER_NAME}.lnk`;
 export const ADMIN_NAME = "z_Eduard005";
 
-export const MC_PORT = "25565";
-
 export const USER_NAME = process.env["USER"] || process.env["USERNAME"]!;
 export const USER_DIR = homedir();
 
