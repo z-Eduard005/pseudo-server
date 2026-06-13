@@ -1,73 +1,43 @@
-import { createInterface } from "readline";
 import { join } from "path";
-import { copyFile, writeFile, rm } from "fs/promises";
+import { copyFile, writeFile } from "fs/promises";
 import {
   IS_WIN32,
-  CUSTOM_VERSION_DIR,
-  WINGET_PACKAGES,
-  SERVER_NAME,
-  SHORTCUT_FILE,
-  SHORTCUT_FILENAME,
-  ICON_FILE,
-  DESKTOP_DIR,
   DESKTOP_ENTRY_PATH,
+  APP_DIR,
+  APP_NAME,
+  DESKTOP_DIR,
+  APP_FILE,
 } from "../constants";
-import { exists, run, isWingetInstalled, retryRun, log, color, throwErr, tryCatch, putConfig, getConfig } from "../utils";
+import { run, retryRun, log, throwErr, tryCatch, putConfig, getConfig, isSuccess, sudo } from "../utils";
 import Zerotier from "./zerotier";
-import JDK from "./jdk";
 import Tlauncher from "./tlauncher";
-import Process from "./process";
-import App from "./app";
 
 export default class Setup {
-  static async ensure() {
-    if ((await getConfig())?.["installed"]) {
-      return;
-    }
+  private static readonly DEFAULT_LINUX_TERM = "ptyxis";
+  private static readonly WINGET_PACKAGES = ["Git.GH", "Git.Git"];
+  private static readonly ICON_FILE = join(
+    APP_DIR,
+    IS_WIN32 ? "icon.ico" : "icon.png"
+  );
+  private static readonly SHORTCUT_FILENAME = `${APP_NAME}.lnk`;
+  private static readonly SHORTCUT_FILE = join(APP_DIR, Setup.SHORTCUT_FILENAME);
 
-    log("First launch — installing dependencies...", "info");
+  private static isWingetInstalled() {
+    return isSuccess(() => {
+      return run("where winget", { inherit: true });
+    });
+  };
 
-    await Process.init();
-
-    await Tlauncher.install();
-
-    await Zerotier.install();
-
-    if (await exists(CUSTOM_VERSION_DIR)) {
-      const answer = await new Promise<string>((resolve) => {
-        const rl = createInterface({
-          input: process.stdin,
-          output: process.stdout,
-        });
-
-        rl.question(
-          color(
-            "Some server files already installed\nWant to reinstall? (y/n)\n(ALL YOUR IN-GAME SETTINGS WILL BE LOST!)\n> ",
-            "warning"
-          ),
-          (input) => {
-            rl.close();
-            resolve(input.trim().toLowerCase());
-          }
+  private static async installGit() {
+    if (IS_WIN32) {
+      await retryRun(() => {
+        return run(
+          'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"',
+          { inherit: true }
         );
       });
 
-      if (answer !== "y") {
-        return;
-      }
-      await rm(CUSTOM_VERSION_DIR, { recursive: true, force: true });
-    }
-
-    log("Installing necessary packages...", "info");
-    if (IS_WIN32) {
-    await retryRun(() => {
-      return run(
-        'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"',
-        { inherit: true }
-      );
-    });
-
-      if (!(await isWingetInstalled())) {
+      if (!(await Setup.isWingetInstalled())) {
         await tryCatch(
           () => {
             return retryRun(() => {
@@ -82,51 +52,64 @@ export default class Setup {
           },
           "Winget is not installed"
         );
-        if (!(await isWingetInstalled())) {
+        if (!(await Setup.isWingetInstalled())) {
           throwErr("Winget is not installed");
         }
       }
 
       await tryCatch(
         () => {
-          return run(`winget install ${WINGET_PACKAGES.join(" ")}`, { inherit: true });
+          return run(`winget install ${Setup.WINGET_PACKAGES.join(" ")}`, { inherit: true });
         },
-        "Some packages are not installed, this might have happened earlier",
+        "Git packages are not installed, this might have happened earlier",
         true
       );
     } else {
-      await JDK.linuxInstall();
+      await tryCatch(
+        async () => {
+          await run(sudo("dnf install git gh"));
+        }, "Error while installing git"
+      )
     }
 
-    await App.install();
-
+    log("Initializing git credentials...", "info");
     await tryCatch(async () => {
+      for (const field of ["name", "email"]) {
+        if (!(await run(`git config --global user.${field}`))) {
+          await run(`git config --global user.${field} "you@example.com"`);
+        }
+      }
+    }, "Git initialization failed");
+  }
+
+  private static async createEntry() {
+    return await tryCatch(async () => {
       if (IS_WIN32) {
         await retryRun(() => {
           return run(
             `powershell -Command "${`
             $WshShell = New-Object -ComObject WScript.Shell
-            $Shortcut = $WshShell.CreateShortcut('${SHORTCUT_FILE}')
+            $Shortcut = $WshShell.CreateShortcut('${Setup.SHORTCUT_FILE}')
             $Shortcut.TargetPath = 'powershell'
-            $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${App.START_SERVER_FILE}'' -Verb RunAs -WindowStyle Hidden"'
-            $Shortcut.WorkingDirectory = '${CUSTOM_VERSION_DIR}'
-            $Shortcut.IconLocation = '${ICON_FILE},0'
-            $Shortcut.Description = '${SERVER_NAME}'
+            $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${APP_FILE}'' -Verb RunAs -WindowStyle Hidden"'
+            $Shortcut.WorkingDirectory = '${APP_DIR}'
+            $Shortcut.IconLocation = '${Setup.ICON_FILE},0'
+            $Shortcut.Description = '${APP_NAME}'
             $Shortcut.Save()`.replace(/\n/g, "; ")}"`,
             { inherit: true }
           );
         });
 
-        await copyFile(SHORTCUT_FILE, join(DESKTOP_DIR, SHORTCUT_FILENAME));
+        await copyFile(Setup.SHORTCUT_FILE, join(DESKTOP_DIR, Setup.SHORTCUT_FILENAME));
       } else {
         await writeFile(
-          join(DESKTOP_ENTRY_PATH, SERVER_NAME + ".desktop"),
+          join(DESKTOP_ENTRY_PATH, APP_NAME + ".desktop"),
           `[Desktop Entry]
-          Name=${SERVER_NAME}
-          Exec=ptyxis -- /bin/bash -lc "DRI_PRIME=1 ${App.START_SERVER_FILE}"
+          Name=${APP_NAME}
+          Exec=${Setup.DEFAULT_LINUX_TERM} -- /bin/bash -lc "DRI_PRIME=1 ${APP_FILE}"
           Type=Application
           Terminal=false
-          Icon=${ICON_FILE}
+          Icon=${Setup.ICON_FILE}
           Categories=Application;`,
           "utf8"
         );
@@ -134,7 +117,22 @@ export default class Setup {
           inherit: true,
         });
       }
-    }, `Failed to create a shortcut for ${SERVER_NAME}\nTry to reinstall by launching this installer again (ALL YOUR IN-GAME SETTINGS WILL BE LOST)`);
+    }, `Failed to create a shortcut for ${APP_NAME}\nTry again`);
+  }
+
+  static async ensure() {
+    const config = await getConfig();
+    if (config?.["installed"]) {
+      return;
+    }
+    log("First launch — installing dependencies...", "info");
+
+    await Tlauncher.install();
+    await Zerotier.install();
+
+    await Setup.installGit();
+
+    await Setup.createEntry();
 
     await putConfig({ installed: true });
     log("Server successfully installed :)", "success");

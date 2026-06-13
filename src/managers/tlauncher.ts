@@ -1,9 +1,11 @@
 import { readFile, writeFile } from "fs/promises";
 import { exists, run, log, throwErr, tryCatch } from "../utils"
 import { join } from "path";
-import { CUSTOM_VERSION, GAME_DIR, IS_WIN32, MC_DIR } from "../constants";
+import { IS_WIN32, MC_DIR } from "../constants";
 import { exec, spawn } from "child_process";
 import JDK from "./jdk";
+
+const CUSTOM_VERSION = "TEST";
 
 export default class Tlauncher {
   private static readonly PROPS_FILE = join(MC_DIR, "tl.properties");
@@ -12,10 +14,6 @@ export default class Tlauncher {
   private static readonly INSTALLER_URL = "https://dl.llaun.ch/legacy/installer";
   private static readonly FEDORA_MC_INSTALLER =
     'sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-mc-installer/main/mc-installer.sh)"';
-  private static readonly VERSION_SRC_REL_PATH = join("home", CUSTOM_VERSION, "tl_version", CUSTOM_VERSION);
-  private static readonly VERSION_DEST_REL_PATH = join("versions", CUSTOM_VERSION);
-  private static readonly VERSION_DEST_PATH = join(GAME_DIR, Tlauncher.VERSION_DEST_REL_PATH);
-  private static readonly VERSIONS_REL_PATH = "versions";
   private static readonly ALLOWED_ACCOUNT_TYPES = ["login.account.type=minecraft", "login.account.type=ely"]
   private static readonly REQUIRED_PROPS = [
     "minecraft.xmx=_RAM_VALUE_",
@@ -59,23 +57,10 @@ export default class Tlauncher {
   };
 
   static async initCustomVersion() {
-    if (await exists(Tlauncher.VERSION_DEST_PATH)) {
-      return;
-    }
     log("Initialiazing custom tlauncher version...", "info")
     await tryCatch(
-      () => {
-        return run(
-          IS_WIN32
-            ? `robocopy ${join(
-              Tlauncher.VERSION_SRC_REL_PATH,
-              ".."
-            )} ${Tlauncher.VERSIONS_REL_PATH} /E`
-            : `cp -r ${Tlauncher.VERSION_SRC_REL_PATH} ${Tlauncher.VERSIONS_REL_PATH}`,
-          { cwd: GAME_DIR }
-        );
-      },
-      `Minecraft version unavailable (check the destination folder - ${Tlauncher.VERSION_DEST_PATH})`
+      () => { },
+      `Minecraft version unavailable`
     );
   }
 

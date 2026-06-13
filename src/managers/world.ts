@@ -1,9 +1,10 @@
 import { mkdir } from "fs/promises";
 import { exists, randomNum, run, log, tryCatch } from "../utils";
-import { USER_NAME, SERVER_DIR } from "../constants";
+import { USER_NAME } from "../constants";
 import JDK from "./jdk";
 import { join } from "path";
 
+const SERVER_DIR = "TEST";
 
 export default class World {
   private static readonly PUSH_INTERVAL_MS = 30 * 60 * 1000;

@@ -31,12 +31,24 @@ export default class Process {
     }, "You don't have admin rights! Please try again...");
   }
 
+  private static async isFedora() {
+    return await tryCatch(
+      async () => {
+        const osRelease = await run("cat /etc/os-release");
+        return osRelease.toLowerCase().includes("id=fedora");
+      }, "Error checking OS type"
+    );
+  }
+
   static async init() {
     process.chdir(USER_DIR);
+
     if (IS_WIN32) {
       await Process.ensureAdmin();
-    } else {
+    } else if (await Process.isFedora()) {
       await run("sudo -v", { inherit: true });
+    } else {
+      throwErr("Sorry, this program works only on Windows or Fedora Linux")
     }
 
     process.on("uncaughtException", (err) => {

@@ -3,17 +3,17 @@ import type { ChildProcessByStdio } from "child_process";
 import { Stream } from "stream";
 import { exists, retryRun, run, log, sudo, throwErr, tryCatch } from "../utils";
 import { join } from "path";
-import { IS_WIN32, SERVER_DIR, SERVER_NAME } from "../constants";
+import { IS_WIN32, APP_DIR, APP_NAME } from "../constants";
 import { writeFile } from "fs/promises";
 import { totalmem } from "os";
 
 export default class JDK {
-  private static readonly FORGE_FILE = join(SERVER_DIR, "forge-1.12.2-14.23.5.2860.jar");
+  private static readonly FORGE_FILE = join(APP_DIR, "forge-1.12.2-14.23.5.2860.jar");
   private static readonly PATH = join("/opt", "jdk8u292-b10")
   private static readonly DOWNLOAD_URL =
     "https://github.com/AdoptOpenJDK/openjdk8-binaries/releases/download/jdk8u292-b10/OpenJDK8U-jdk_x64_linux_hotspot_8u292b10.tar.gz";
   private static readonly DOWNLOAD_FILENAME = "jdk8u292-b10.tar.gz";
-  private static readonly SERVER_PROPS_FILE = join(SERVER_DIR, "server.properties");
+  private static readonly SERVER_PROPS_FILE = join(APP_DIR, "server.properties");
   private static readonly _FILE = IS_WIN32
     ? join("C:", "Program Files", "AdoptOpenJDK", "jdk-8.0.292.10-hotspot", "bin", "java.exe")
     : join(JDK.PATH, "bin", "java");
@@ -51,7 +51,7 @@ export default class JDK {
         ],
         {
           stdio: ["pipe", "pipe", "inherit"],
-          cwd: SERVER_DIR,
+          cwd: APP_DIR,
           windowsHide: true,
         }
       );
@@ -165,7 +165,7 @@ online-mode=false
 max-build-height=256
 level-seed=
 prevent-proxy-connections=false
-motd=${SERVER_NAME}
+motd=${APP_NAME}
 enable-rcon=false
 defaultworldgenerator-port=
 `;

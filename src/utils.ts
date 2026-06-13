@@ -125,12 +125,6 @@ export const randomNum = (length: number) => {
   return Math.floor(Math.random() * Number("1e" + length.toFixed(0).replace("-", "")));
 };
 
-export const isWingetInstalled = () => {
-  return isSuccess(() => {
-    return run("where winget", { inherit: true });
-  });
-};
-
 export const sudo = (cmd: string) => {
   return IS_WIN32 ? cmd : `sudo ${cmd}`;
 };

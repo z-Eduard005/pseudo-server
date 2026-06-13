@@ -1,8 +1,9 @@
 import { join } from "path";
 import { tryCatch } from "../utils";
-import { CUSTOM_VERSION_DIR, SERVER_NAME } from "../constants";
 import { rm, writeFile } from "fs/promises";
 
+const CUSTOM_VERSION_DIR = "TEST";
+const SERVER_NAME = "TEST";
 export default class Minecraft {
   private static readonly SERVERS_BAK_FILE = join(CUSTOM_VERSION_DIR, "servers.dat.bak");
   private static readonly SERVERS_FILE = join(CUSTOM_VERSION_DIR, "servers.dat");
