@@ -1,6 +1,5 @@
 import { CUSTOM_VERSION_DIR, IS_WIN32, SERVER_NAME } from "../constants";
 import { run, log, tryCatch } from "../utils";
-import Process from "./process";
 import { join } from "path";
 
 export default class App {
@@ -10,14 +9,14 @@ export default class App {
     return this._START_SERVER_FILE;
   }
 
-  private static async update() {
-    log(`${SERVER_NAME} will be updated now...`, 'warning');
-    await Process.pause();
+  // private static async update() {
+  //   log(`${SERVER_NAME} will be updated now...`, 'warning');
+  //   await Process.pause();
 
-    // TODO: logic 
+  //   // TODO: logic 
 
-    await Process.stop();
-  }
+  //   await Process.stop();
+  // }
 
   private static async gitInit() {
     let logged: boolean;

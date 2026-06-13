@@ -1,5 +1,6 @@
 import { ADMIN_NAME } from "./constants";
 import { log, tryCatch, throwErr } from "./utils";
+import UI from "./managers/ui";
 import Zerotier from "./managers/zerotier";
 import World from "./managers/world";
 import JDK from "./managers/jdk";
@@ -20,6 +21,20 @@ tryCatch(
 
     // checking the amount of memory
     JDK.getRam();
+
+    const option = await UI.menu([
+      "Create Server Instance",
+      "Choose Server",
+      "Add New Server",
+    ], "Pseudo-Server", "Choose an option:");
+
+    if (option === "Create Server Instance") {
+      // await createServerInstance();
+    } else if (option === "Choose Server") {
+      // await chooseServer();
+    } else if (option === "Add New Server") {
+      // await addNewServer();
+    }
 
     // checking connection to tlauncher account
     await Tlauncher.checkAccountType();
