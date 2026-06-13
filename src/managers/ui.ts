@@ -164,14 +164,20 @@ export default class UI {
     });
   }
 
-  static input(title?: string, desc?: string, backText?: string, maxLen?: number): Promise<string | null> {
+  static input(title?: string, desc?: string, defaultValue?: string, backText?: string, maxLen?: number): Promise<string | null> {
     return new Promise((resolve) => {
-      let value = "";
-      let cursorPos = 0;
+      let value = defaultValue ?? "";
+      let cursorPos = value.length;
+      let triedSubmit = false;
       let keyHandler: (key: string) => void = () => { };
 
       const MAX_LEN = Math.min(maxLen ?? 50, 100);
       const CURSOR_BG = "\x1B[48;5;22m";
+
+      const getError = (): string | null => {
+        if (value.length <= 3) return "Must be more than 3 symbols";
+        return null;
+      };
 
       const draw = () => {
         const inputWidth = Math.min(MAX_LEN, UI.cols() - 4);
@@ -208,7 +214,14 @@ export default class UI {
 
         const line = `${indent}${UI.BG}${UI.FG}${visible}${UI.RST}`;
 
-        return [emptyLine, line, emptyLine].join("\n");
+        const error = getError();
+        const errorLine = triedSubmit && error
+          ? `${indent}\x1B[38;5;196m* ${error}\x1B[39m`
+          : null;
+
+        const parts = [emptyLine, line, emptyLine];
+        if (errorLine) parts.push(errorLine);
+        return parts.join("\n");
       };
 
       const { cleanup, rerender } = UI.render(draw, (key) => keyHandler(key), title, desc, backText);
@@ -220,6 +233,11 @@ export default class UI {
           return;
         }
         if (key === "\r" || key === "\n") {
+          if (getError()) {
+            triedSubmit = true;
+            rerender();
+            return;
+          }
           cleanup();
           resolve(value);
           return;

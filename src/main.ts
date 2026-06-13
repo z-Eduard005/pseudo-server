@@ -16,21 +16,43 @@ tryCatch(
     await Setup.ensure();
     await App.checkForUpdates();
 
-    const option = await UI.menu([
-      "Create Server Instance",
-      "Choose Server",
-      "Add New Server",
-    ], "Pseudo-Server", "Choose an option:", "Exit");
+    while (true) {
+      const option = await UI.menu([
+        "Create Server Instance",
+        "Choose Server",
+        "Add New Server",
+      ], "Pseudo-Server", "Choose an option:", "Exit");
 
-    if (option === "Create Server Instance") {
-      const serverName = await UI.input("Enter server name", "Type a name for your server:");
-      // await createServerInstance();
-    } else if (option === "Choose Server") {
-      // await chooseServer();
-    } else if (option === "Add New Server") {
-      // await addNewServer();
-    } else {
-      await Process.stop();
+      if (option === null) {
+        await Process.stop();
+      }
+
+      if (option === "Create Server Instance") {
+        let serverName = "";
+        let somethingElse = "";
+        let step = 1;
+
+        while (step > 0 && step < 3) {
+          if (step === 1) {
+            const result = await UI.input("[1|2]: Server creation...", "Type a name for your server:", serverName || undefined);
+            if (result === null) { step = 0; break; }
+            serverName = result;
+            step = 2;
+          }
+          if (step === 2) {
+            const result = await UI.input("[2|2]: Server creation...", "Type something else:", somethingElse || undefined);
+            if (result === null) { step = 1; continue; }
+            somethingElse = result;
+            step = 3;
+          }
+        }
+
+        if (step < 2) continue; // Esc on step 1 → main menu
+        break; // both steps done → proceed to setup
+      }
+
+      if (option === "Choose Server") continue;
+      if (option === "Add New Server") continue;
     }
 
     JDK.getRam();
