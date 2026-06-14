@@ -105,15 +105,15 @@ export default class UI {
     return { cleanup, rerender: renderFrame };
   }
 
-  static menu(items: string[], title?: string, desc?: string, backText?: string): Promise<string | null> {
+  static menu(items: string[], title?: string, desc?: string, backText?: string): Promise<{ value: string | null; cancelled: boolean }> {
     return new Promise((resolve) => {
       let selectedIndex = 0;
       let keyHandler: (key: string) => void = () => { };
 
       const draw = () => {
         const LIST_WIDTH = 50;
-        const SEL_BG = "\x1B[48;5;245m";
-        const SEL_FG = "\x1B[38;5;22m";
+        const SEL_BG = "\x1B[48;5;27m";
+        const SEL_FG = "\x1B[38;5;255m";
         const TEXT_AREA = LIST_WIDTH - 2 * UI.PADDING;
         const listLeft = Math.floor((UI.cols() - LIST_WIDTH) / 2);
         const listIndent = " ".repeat(Math.max(0, listLeft));
@@ -142,12 +142,12 @@ export default class UI {
       keyHandler = (key) => {
         if (key === "\u001b") {
           cleanup();
-          resolve(null);
+          resolve({ value: null, cancelled: true });
           return;
         }
         if (key === "\r" || key === "\n") {
           cleanup();
-          resolve(items[selectedIndex]!);
+          resolve({ value: items[selectedIndex]!, cancelled: false });
           return;
         }
         if (key === "\u001b[A") {
@@ -164,7 +164,7 @@ export default class UI {
     });
   }
 
-  static input(title?: string, desc?: string, defaultValue?: string, backText?: string, maxLen?: number): Promise<string | null> {
+  static input(title?: string, desc?: string, defaultValue?: string, backText?: string, maxLen?: number): Promise<{ value: string; cancelled: boolean }> {
     return new Promise((resolve) => {
       let value = defaultValue ?? "";
       let cursorPos = value.length;
@@ -172,7 +172,7 @@ export default class UI {
       let keyHandler: (key: string) => void = () => { };
 
       const MAX_LEN = Math.min(maxLen ?? 50, 100);
-      const CURSOR_BG = "\x1B[48;5;22m";
+      const CURSOR_BG = "\x1B[48;5;27m";
 
       const getError = (): string | null => {
         if (value.length <= 3) return "Must be more than 3 symbols";
@@ -203,11 +203,11 @@ export default class UI {
 
           if (charIndex < value.length) {
             visible += isCursor
-              ? `${CURSOR_BG}\x1B[38;5;15m\x1B[5m${value[charIndex]!}\x1B[25m${UI.BG}${UI.FG}`
+              ? `${CURSOR_BG}\x1B[38;5;15m${value[charIndex]!}${UI.BG}${UI.FG}`
               : value[charIndex]!;
           } else {
             visible += isCursor
-              ? `${CURSOR_BG}\x1B[5m \x1B[25m${UI.BG}${UI.FG}`
+              ? `${CURSOR_BG} ${UI.BG}${UI.FG}`
               : `\x1B[2m_\x1B[22m`;
           }
         }
@@ -229,7 +229,7 @@ export default class UI {
       keyHandler = (key) => {
         if (key === "\u001b") {
           cleanup();
-          resolve(null);
+          resolve({ value, cancelled: true });
           return;
         }
         if (key === "\r" || key === "\n") {
@@ -239,7 +239,7 @@ export default class UI {
             return;
           }
           cleanup();
-          resolve(value);
+          resolve({ value, cancelled: false });
           return;
         }
         if (key === "\x7f" || key === "\b") {
@@ -267,7 +267,7 @@ export default class UI {
         if (key.length > 1 && key.charCodeAt(0) !== 27) {
           const sanitized = [...key].filter((c) => {
             const code = c.charCodeAt(0);
-            return code >= 32 && code <= 126;
+            return code >= 33 && code <= 126;
           }).join("");
           if (sanitized.length === 0) return;
           const available = MAX_LEN - value.length;
@@ -279,7 +279,7 @@ export default class UI {
           }
           return;
         }
-        if (key.length === 1 && key.charCodeAt(0) >= 32 && value.length < MAX_LEN) {
+        if (key.length === 1 && key.charCodeAt(0) >= 33 && value.length < MAX_LEN) {
           value = value.slice(0, cursorPos) + key + value.slice(cursorPos);
           cursorPos++;
           rerender();

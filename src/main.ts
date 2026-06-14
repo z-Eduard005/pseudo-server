@@ -17,13 +17,13 @@ tryCatch(
     await App.checkForUpdates();
 
     while (true) {
-      const option = await UI.menu([
+      const { value: option, cancelled } = await UI.menu([
         "Create Server Instance",
         "Choose Server",
         "Add New Server",
       ], "Pseudo-Server", "Choose an option:", "Exit");
 
-      if (option === null) {
+      if (cancelled) {
         await Process.stop();
       }
 
@@ -34,21 +34,21 @@ tryCatch(
 
         while (step > 0 && step < 3) {
           if (step === 1) {
-            const result = await UI.input("[1|2]: Server creation...", "Type a name for your server:", serverName || undefined);
-            if (result === null) { step = 0; break; }
-            serverName = result;
+            const { value, cancelled } = await UI.input("[1|2]: Server creation...", "Type a name for your server:", serverName || undefined);
+            if (cancelled) { step = 0; break; }
+            serverName = value;
             step = 2;
           }
           if (step === 2) {
-            const result = await UI.input("[2|2]: Server creation...", "Type something else:", somethingElse || undefined);
-            if (result === null) { step = 1; continue; }
-            somethingElse = result;
+            const { value, cancelled } = await UI.input("[2|2]: Server creation...", "Type something else:", somethingElse || undefined);
+            if (cancelled) { somethingElse = value; step = 1; continue; }
+            somethingElse = value;
             step = 3;
           }
         }
 
-        if (step < 2) continue; // Esc on step 1 → main menu
-        break; // both steps done → proceed to setup
+        if (step < 2) continue;
+        break;
       }
 
       if (option === "Choose Server") continue;
