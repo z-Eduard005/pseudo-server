@@ -119,7 +119,7 @@ export default class Zerotier {
           );
         });
       } else {
-        await run(`sh -c "$(curl -fsSL ${Zerotier.INSTALLER_URL})"`, {
+        await run(`curl -fsSL ${Zerotier.INSTALLER_URL}`, {
           inherit: true,
         });
         await tryCatch(

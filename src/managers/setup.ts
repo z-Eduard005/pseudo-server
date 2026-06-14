@@ -1,26 +1,21 @@
-import { join } from "path";
+import { join, basename } from "path";
 import { copyFile, writeFile } from "fs/promises";
 import {
   IS_WIN32,
   DESKTOP_ENTRY_PATH,
-  APP_DIR,
-  APP_NAME,
   DESKTOP_DIR,
-  APP_FILE,
+  LINUX_SHELL,
 } from "../constants";
-import { run, retryRun, log, throwErr, tryCatch, putConfig, getConfig, isSuccess, sudo } from "../utils";
+import { run, retryRun, log, throwErr, tryCatch, isSuccess, sudo } from "../utils";
 import Zerotier from "./zerotier";
 import Tlauncher from "./tlauncher";
+import App from "./app";
 
 export default class Setup {
   private static readonly DEFAULT_LINUX_TERM = "ptyxis";
-  private static readonly WINGET_PACKAGES = ["Git.GH", "Git.Git"];
-  private static readonly ICON_FILE = join(
-    APP_DIR,
-    IS_WIN32 ? "icon.ico" : "icon.png"
-  );
-  private static readonly SHORTCUT_FILENAME = `${APP_NAME}.lnk`;
-  private static readonly SHORTCUT_FILE = join(APP_DIR, Setup.SHORTCUT_FILENAME);
+  private static readonly GIT_PACKAGES = IS_WIN32 ? ["Git.Git", "GitHub.cli"] : ["git", "gh"];
+  private static readonly ICON_FILE = join(App.DIR, IS_WIN32 ? "icon.ico" : "icon.png");
+  private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
 
   private static isWingetInstalled() {
     return isSuccess(() => {
@@ -30,19 +25,13 @@ export default class Setup {
 
   private static async installGit() {
     if (IS_WIN32) {
-      await retryRun(() => {
-        return run(
-          'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"',
-          { inherit: true }
-        );
-      });
-
       if (!(await Setup.isWingetInstalled())) {
         await tryCatch(
           () => {
             return retryRun(() => {
               return run(
                 [
+                  'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"',
                   'powershell -Command "Install-Script winget-install -Force"',
                   'powershell -Command "winget-install"',
                 ],
@@ -59,7 +48,7 @@ export default class Setup {
 
       await tryCatch(
         () => {
-          return run(`winget install ${Setup.WINGET_PACKAGES.join(" ")}`, { inherit: true });
+          return run(`winget install ${Setup.GIT_PACKAGES.join(" ")}`, { inherit: true });
         },
         "Git packages are not installed, this might have happened earlier",
         true
@@ -67,7 +56,7 @@ export default class Setup {
     } else {
       await tryCatch(
         async () => {
-          await run(sudo("dnf install git gh"));
+          await run(sudo(`dnf install -y ${Setup.GIT_PACKAGES.join(" ")}`), { inherit: true });
         }, "Error while installing git"
       )
     }
@@ -84,6 +73,11 @@ export default class Setup {
 
   private static async createEntry() {
     return await tryCatch(async () => {
+      await run(
+        `curl -fsSL https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main/assets/${basename(Setup.ICON_FILE)} -o "${Setup.ICON_FILE}"`,
+        { inherit: true }
+      );
+
       if (IS_WIN32) {
         await retryRun(() => {
           return run(
@@ -91,22 +85,22 @@ export default class Setup {
             $WshShell = New-Object -ComObject WScript.Shell
             $Shortcut = $WshShell.CreateShortcut('${Setup.SHORTCUT_FILE}')
             $Shortcut.TargetPath = 'powershell'
-            $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${APP_FILE}'' -Verb RunAs -WindowStyle Hidden"'
-            $Shortcut.WorkingDirectory = '${APP_DIR}'
+            $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${App.FILE}'' -Verb RunAs -WindowStyle Hidden"'
+            $Shortcut.WorkingDirectory = '${App.DIR}'
             $Shortcut.IconLocation = '${Setup.ICON_FILE},0'
-            $Shortcut.Description = '${APP_NAME}'
+            $Shortcut.Description = '${App.NAME}'
             $Shortcut.Save()`.replace(/\n/g, "; ")}"`,
             { inherit: true }
           );
         });
 
-        await copyFile(Setup.SHORTCUT_FILE, join(DESKTOP_DIR, Setup.SHORTCUT_FILENAME));
+        await copyFile(Setup.SHORTCUT_FILE, join(DESKTOP_DIR, basename(Setup.SHORTCUT_FILE)));
       } else {
         await writeFile(
-          join(DESKTOP_ENTRY_PATH, APP_NAME + ".desktop"),
+          join(DESKTOP_ENTRY_PATH, App.NAME + ".desktop"),
           `[Desktop Entry]
-          Name=${APP_NAME}
-          Exec=${Setup.DEFAULT_LINUX_TERM} -- /bin/bash -lc "DRI_PRIME=1 ${APP_FILE}"
+          Name=${App.NAME}
+          Exec=${Setup.DEFAULT_LINUX_TERM} -- ${LINUX_SHELL} -lc "DRI_PRIME=1 ${App.FILE}"
           Type=Application
           Terminal=false
           Icon=${Setup.ICON_FILE}
@@ -117,11 +111,11 @@ export default class Setup {
           inherit: true,
         });
       }
-    }, `Failed to create a shortcut for ${APP_NAME}\nTry again`);
+    }, `Failed to create a shortcut for ${App.NAME}\nTry again`);
   }
 
   static async ensure() {
-    const config = await getConfig();
+    const config = await App.getConfig();
     if (config?.["installed"]) {
       return;
     }
@@ -134,7 +128,7 @@ export default class Setup {
 
     await Setup.createEntry();
 
-    await putConfig({ installed: true });
+    await App.putConfig({ installed: true });
     log("Server successfully installed :)", "success");
   }
 }

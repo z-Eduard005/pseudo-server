@@ -4,7 +4,6 @@ import { homedir } from "os";
 
 export const IS_WIN32 = process.platform === "win32";
 export const LINUX_SHELL = "/bin/bash";
-
 export const USER_NAME = process.env["USER"] || process.env["USERNAME"]!;
 export const USER_DIR = homedir();
 
@@ -52,7 +51,3 @@ export const MC_DIR = join(
 
 export const GAME_DIR = join(MC_DIR, "game");
 export const DESKTOP_DIR = join(USER_DIR, "Desktop");
-export const APP_DIR = IS_WIN32 ? join() : join();
-export const APP_NAME = "Pseudo-server";
-export const APP_FILE = join(APP_DIR, IS_WIN32 ? APP_NAME + ".exe" : APP_NAME);
-export const CONFIG_FILE = join(APP_DIR, "config.json");

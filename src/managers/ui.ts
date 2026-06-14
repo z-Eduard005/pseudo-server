@@ -8,6 +8,9 @@ export default class UI {
   private static readonly BG = "\x1B[48;5;235m";
   private static readonly FG = "\x1B[38;5;255m";
   private static readonly RST = "\x1B[39m\x1B[49m";
+  static readonly START_ART = `┏━┓┏━┓┏━╸╻ ╻╺┳┓┏━┓   ┏━┓┏━╸┏━┓╻ ╻┏━╸┏━┓
+┣━┛┗━┓┣╸ ┃ ┃ ┃┃┃ ┃╺━╸┗━┓┣╸ ┣┳┛┃┏┛┣╸ ┣┳┛
+╹  ┗━┛┗━╸┗━┛╺┻┛┗━┛   ┗━┛┗━╸╹┗╸┗┛ ┗━╸╹┗╸`;
 
   private static cols(): number {
     return process.stdout.columns || 80;

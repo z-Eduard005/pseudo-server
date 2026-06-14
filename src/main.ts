@@ -21,7 +21,7 @@ tryCatch(
         "Create Server Instance",
         "Choose Server",
         "Add New Server",
-      ], "Pseudo-Server", "Choose an option:", "Exit");
+      ], UI.START_ART, "Choose an option:", "Exit");
 
       if (cancelled) {
         await Process.stop();

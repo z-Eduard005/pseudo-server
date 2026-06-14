@@ -1,9 +1,9 @@
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import { setTimeout as setTimeoutPromise } from "timers/promises";
-import { IS_WIN32, LINUX_SHELL, CONFIG_FILE } from "./constants";
+import { IS_WIN32, LINUX_SHELL } from "./constants";
 import type { TryCatch, Run, LogType } from "./types";
-import { access, constants, readFile, writeFile } from "fs/promises";
+import { access, constants } from "fs/promises";
 
 export const run: Run = async (commands, options) => {
   const result: string[] = [],
@@ -128,26 +128,3 @@ export const randomNum = (length: number) => {
 export const sudo = (cmd: string) => {
   return IS_WIN32 ? cmd : `sudo ${cmd}`;
 };
-
-export const getConfig = async (): Promise<Record<string, unknown> | undefined> => {
-  if (!(await exists(CONFIG_FILE))) {
-    return undefined;
-  }
-  return await tryCatch(
-    async () => {
-      return JSON.parse(await readFile(CONFIG_FILE, "utf8"));
-    },
-    "Failed to read config file"
-  );
-};
-
-export const putConfig = async (data: Record<string, unknown>) => {
-  const existing = await getConfig();
-  await tryCatch(
-    () => {
-      return writeFile(CONFIG_FILE, JSON.stringify({ ...(existing ?? {}), ...data }));
-    },
-    "Failed to write config file"
-  );
-};
-
