@@ -149,8 +149,8 @@ export default class App {
     if (IS_WIN32) {
       spawn("cmd", [
         "/c",
-        `timeout /t 3 /nobreak > nul & del /f /q "${process.execPath}"`,
-      ], { detached: true, stdio: "ignore" }).unref();
+        `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}"`,
+      ], { detached: true, stdio: "ignore", windowsHide: true }).unref();
       log(`Please restart the app with the shortcut "${App.SHORTCUT_FILE}"`, "warning")
     } else {
       await rename(process.execPath, App.FILE);
@@ -216,8 +216,8 @@ export default class App {
     await Tlauncher.install();
     await Zerotier.install();
 
-    await App.moveBinnary();
     await App.createEntry();
+    await App.moveBinnary();
 
     const config = await App.getConfig();
     if (config?.["installed"] !== true) {
