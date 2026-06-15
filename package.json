@@ -7,7 +7,7 @@
   "scripts": {
     "ts-handle": "tsup src/main.ts --format cjs --target node18 --out-dir build --treeshake --minify",
     "pkg-handle": "pkg build/main.js -o build/Pseudo-Server.exe -t node18-win-x64 && pkg build/main.js -o build/Pseudo-Server -t node18-linux-x64 && chmod +x build/Pseudo-Server",
-    "bump-version": "",
+    "bump-version": "node scripts/bump-version.js",
     "build": "npm run ts-handle && npm run pkg-handle && npm run bump-version"
   },
   "devDependencies": {

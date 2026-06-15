@@ -190,7 +190,7 @@ export default class App {
         await writeFile(`${App.FILE}.update`, buffer);
         spawn("cmd", [
           "/c",
-          `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}"`,
+          `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}" & move /y "${App.FILE}.update" "${App.FILE}"`,
         ], { detached: true, stdio: "ignore", windowsHide: true }).unref();
       } else {
         await writeFile(App.FILE, buffer);
@@ -198,7 +198,7 @@ export default class App {
 
       log("Update downloaded. Restart app to apply.", "success");
       await Process.stop();
-    }, "Failed to check the updates");
+    }, "Failed to update the program");
   }
 
   static async setup() {
