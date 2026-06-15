@@ -1,5 +1,5 @@
 import { join, basename, normalize } from "path";
-import { copyFile, readFile, writeFile, mkdir, unlink, rename } from "fs/promises";
+import { copyFile, readFile, writeFile, mkdir, rename } from "fs/promises";
 import { spawn } from "child_process";
 import {
   IS_WIN32,
@@ -11,6 +11,14 @@ import { run, retryRun, log, throwErr, tryCatch, isSuccess, sudo, exists } from 
 import Zerotier from "./zerotier";
 import Tlauncher from "./tlauncher";
 import Process from "./process";
+
+type GithubRelease = {
+  tag_name: string;
+  assets: {
+    name: string;
+    browser_download_url: string
+  }[]
+}
 
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
@@ -162,40 +170,33 @@ export default class App {
 
   private static async checkUpdates() {
     await tryCatch(async () => {
-      const updateFile = App.FILE + ".update";
-      if (await exists(updateFile)) {
-        await copyFile(updateFile, App.FILE);
-        await unlink(updateFile);
-        log("Update applied. Restarting...", "info");
-        spawn(App.FILE, process.argv.slice(1), { stdio: "inherit" });
-        process.exit(0);
-      }
-
       const res = await fetch(App.RELEASE_URL);
       if (!res.ok) return;
 
-      const data = (await res.json()) as { tag_name: string; assets: { name: string; browser_download_url: string }[] };
-      const latestTag = data.tag_name;
-      if (latestTag.replace(/^v/, "") === App.VERSION) return;
+      const release = (await res.json()) as GithubRelease;
+      if (release.tag_name.replace(/^v/, "") === App.VERSION) return;
 
       const assetName = IS_WIN32 ? App.NAME + ".exe" : App.NAME;
-      const asset = data.assets.find(a => { return a.name === assetName; });
+      const asset = release.assets.find(a => { return a.name === assetName; });
       if (!asset) {
-        log(`No download found for ${assetName} in release ${latestTag}`, "warning");
-        return;
+        throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
       }
 
-      log(`Downloading ${latestTag}...`, "info");
-      const dl = await fetch(asset.browser_download_url);
+      log(`Downloading ${release.tag_name}...`, "info");
+      const dl = await fetch(asset!.browser_download_url);
       const buffer = Buffer.from(await dl.arrayBuffer());
 
       if (IS_WIN32) {
-        await writeFile(updateFile, buffer);
+        await writeFile(`${App.FILE}.update`, buffer);
+        spawn("cmd", [
+          "/c",
+          `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}"`,
+        ], { detached: true, stdio: "ignore", windowsHide: true }).unref();
       } else {
         await writeFile(App.FILE, buffer);
       }
 
-      log(`Update ${latestTag} downloaded. Restart app to apply.`, "success");
+      log("Update downloaded. Restart app to apply.", "success");
       await Process.stop();
     }, "Failed to check the updates");
   }

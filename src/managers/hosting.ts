@@ -2,6 +2,7 @@ import { createSocket, type Socket } from "dgram";
 import { log, throwErr, tryCatch } from "../utils";
 import Zerotier from "./zerotier";
 import JDK from "./jdk";
+import Minecraft from "./minecraft";
 
 type BroadcastData = { type: string; ip: string }
 
@@ -41,7 +42,10 @@ export default class Hosting {
         if (!Hosting.hostFound) {
           Hosting.hostFound = true;
           Hosting._ip = msg.ip;
-          log(`Someone is already playing on ${msg.ip}:${JDK.PORT}`, "info");
+          const fullIP = `${msg.ip}:${JDK.PORT}`;
+
+          log(`Someone is already playing on ${fullIP}`, "info");
+          Minecraft.addServerToMenu(fullIP);
           Hosting.continueMonitoring();
         } else if (Hosting.ip === msg.ip) {
           Hosting.continueMonitoring();
@@ -49,7 +53,10 @@ export default class Hosting {
           clearInterval(Hosting.heartBeatTimer);
           clearTimeout(Hosting.confirmTimer);
           Hosting._ip = msg.ip;
-          log(`Reconecting to new host on ${msg.ip}:${JDK.PORT}`, "info");
+          const fullIP = `${msg.ip}:${JDK.PORT}`;
+
+          log(`Reconecting to new host on ${fullIP}`, "info");
+          Minecraft.addServerToMenu(fullIP);
           Hosting.continueMonitoring();
         }
       });
@@ -79,13 +86,14 @@ export default class Hosting {
           Hosting.BROADCAST_PORT,
           Hosting.BROADCAST_IP
         ),
-        "Hosting connection error (check your connection)"
+        "Hosting connection error (bad internet)"
 
       );
     }, Hosting.HEARTBEAT_INTERVAL);
 
     Hosting.confirmTimer = setTimeout(() => {
-      log("Wait, you will be the host...", "info");
+      log("Wait, you will be hosting...", "info");
+      Minecraft.addServerToMenu(`${Zerotier.ip}:${JDK.PORT}`);
       Hosting.resolve();
     }, Hosting.CONFIRM_TIMEOUT);
   }
