@@ -7,13 +7,6 @@ export const LINUX_SHELL = "/bin/bash";
 export const USER_NAME = process.env["USER"] || process.env["USERNAME"]!;
 export const USER_DIR = homedir();
 
-export const DESKTOP_ENTRY_PATH = join(
-  USER_DIR,
-  ".local",
-  "share",
-  "applications"
-);
-
 export const MC_REL_PATH = join(
   "AppData",
   "Roaming",

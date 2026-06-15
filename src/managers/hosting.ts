@@ -56,7 +56,7 @@ export default class Hosting {
 
       await tryCatch(
         () => Hosting.socket.bind(Hosting.BROADCAST_PORT),
-        `Port ${Hosting.BROADCAST_PORT} is already in use by ${Hosting.getPortOwner() || "another process"}. Close it and try again.`
+        `Port ${Hosting.BROADCAST_PORT} is already in use by ${Hosting.getPortOwner() || "another process"}`
       );
 
       setTimeout(() => {

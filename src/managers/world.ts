@@ -12,15 +12,8 @@ export default class World {
   private static readonly DIR = join(SERVER_DIR, "world");
   private static readonly REPO_URL = "TEST"
 
-  private static _initialized = false;
-  private static _nodePushInterval: NodeJS.Timeout;
-
-  static get initialized() {
-    return this._initialized;
-  }
-  static get nodePushInterval() {
-    return this._nodePushInterval;
-  }
+  static initialized = false;
+  static nodePushInterval: NodeJS.Timeout;
 
   static async init() {
     await tryCatch(async () => {
@@ -44,19 +37,19 @@ export default class World {
         ["git reflog expire --expire=now --all", "git gc --prune=now"],
         { cwd: World.DIR }
       );
-      World._initialized = true;
+      World.initialized = true;
     }, "Error during Minecraft world initialization");
   }
 
   static enableRepeatedPush() {
-    World._nodePushInterval = setInterval(async () => {
+    World.nodePushInterval = setInterval(async () => {
       await World.push();
       log("The world has been sent to the cloud", "warning");
     }, World.PUSH_INTERVAL_MS);
   }
 
   static disableRepeatedPush() {
-    clearInterval(World._nodePushInterval)
+    clearInterval(World.nodePushInterval)
   }
 
   static async push() {

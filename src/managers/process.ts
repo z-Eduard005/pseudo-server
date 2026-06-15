@@ -1,4 +1,3 @@
-import { spawn } from "child_process";
 import { IS_WIN32, USER_DIR } from "../constants";
 import { color, isSuccess, log, run, throwErr, tryCatch } from "../utils";
 import { createInterface } from "readline";
@@ -11,24 +10,10 @@ export default class Process {
   private static closing = false;
 
   private static async ensureAdmin() {
-    await tryCatch(async () => {
-      if (await isSuccess(() => {
-        return run("net session");
-      })) {
-        return;
-      }
-      spawn(
-        "powershell",
-        ["-Command", `Start-Process "${process.execPath}" -Verb RunAs`],
-        {
-          detached: true,
-          stdio: "ignore",
-        }
-      ).unref();
+    const isAdmin = await isSuccess(() => run("net session"));
+    if (isAdmin) return;
 
-      // await setTimeoutPromise(5000);
-      await Process.stop();
-    }, "You don't have admin rights! Please try again...");
+    throwErr(`You don't have admin rights!\nPlease start the program as an admin`)
   }
 
   private static async isFedora() {

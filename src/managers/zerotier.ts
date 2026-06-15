@@ -64,7 +64,7 @@ export default class Zerotier {
       await setTimeoutPromise(Zerotier.CMD_TIMEOUT);
 
       return await run(sudo(`"${Zerotier.FILE}" listnetworks`));
-    }, "Failed to join zerotier network (try again!)");
+    }, "Failed to join zerotier network");
 
     if (
       networks.includes("ACCESS_DENIED") ||

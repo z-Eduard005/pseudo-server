@@ -1,8 +1,8 @@
-import { join, basename } from "path";
-import { copyFile, readFile, writeFile } from "fs/promises";
+import { join, basename, normalize } from "path";
+import { copyFile, readFile, writeFile, mkdir, unlink, rename } from "fs/promises";
+import { spawn } from "child_process";
 import {
   IS_WIN32,
-  DESKTOP_ENTRY_PATH,
   DESKTOP_DIR,
   LINUX_SHELL,
   USER_DIR,
@@ -10,22 +10,24 @@ import {
 import { run, retryRun, log, throwErr, tryCatch, isSuccess, sudo, exists } from "../utils";
 import Zerotier from "./zerotier";
 import Tlauncher from "./tlauncher";
+import Process from "./process";
 
 export default class App {
-  // private static readonly VERSION = "0.0.0";
-  // private static readonly GITHUB = "z-Eduard005/pseudo-server";
-  private static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
-  private static readonly NAME = "Pseudo-Server";
+  static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
+  static readonly NAME = "Pseudo-Server";
+  private static readonly VERSION = "0.0.0";
+  private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
+  private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
   private static readonly CONFIG_FILE = join(App.DIR, "config.json");
-
   private static readonly DEFAULT_LINUX_TERM = "ptyxis";
   private static readonly GIT_PACKAGES = IS_WIN32 ? ["Git.Git", "GitHub.cli"] : ["git", "gh"];
   private static readonly ICON_FILE = join(App.DIR, IS_WIN32 ? "icon.ico" : "icon.png");
   private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
-  private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
+  private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
+  private static readonly DESKTOP_ENTRY_FILE = join(App.DESKTOP_ENTRY_PATH, App.NAME + ".desktop");
 
-  static async getConfig(): Promise<Record<string, unknown> | undefined> {
+  private static async getConfig(): Promise<Record<string, unknown> | undefined> {
     if (!(await exists(App.CONFIG_FILE))) return;
 
     return await tryCatch(
@@ -36,7 +38,7 @@ export default class App {
     );
   }
 
-  static async putConfig(data: Record<string, unknown>) {
+  private static async putConfig(data: Record<string, unknown>) {
     const existing = await App.getConfig();
     await tryCatch(
       () => {
@@ -124,7 +126,7 @@ export default class App {
         await copyFile(App.SHORTCUT_FILE, join(DESKTOP_DIR, basename(App.SHORTCUT_FILE)));
       } else {
         await writeFile(
-          join(DESKTOP_ENTRY_PATH, App.NAME + ".desktop"),
+          App.DESKTOP_ENTRY_FILE,
           `[Desktop Entry]
           Name=${App.NAME}
           Exec=${App.DEFAULT_LINUX_TERM} -- ${LINUX_SHELL} -lc "DRI_PRIME=1 ${App.FILE}"
@@ -134,17 +136,72 @@ export default class App {
           Categories=Application;`,
           "utf8"
         );
-        await run(`update-desktop-database ${DESKTOP_ENTRY_PATH}`, {
-          inherit: true,
-        });
+        await run(`update-desktop-database ${App.DESKTOP_ENTRY_PATH}`, { inherit: true });
       }
-    }, `Failed to create a shortcut for ${App.NAME}\nTry again`);
+    }, `Failed to create a shortcut for ${App.NAME}`);
+  }
+
+  private static async moveBinnary() {
+    const processPath = normalize(process.execPath).toLowerCase();
+    const appFile = normalize(App.FILE).toLowerCase();
+    if (processPath === appFile) return;
+
+    if (IS_WIN32) {
+      spawn("cmd", [
+        "/c",
+        `timeout /t 3 /nobreak > nul & del /f /q "${process.execPath}"`,
+      ], { detached: true, stdio: "ignore" }).unref();
+      log(`Please restart the app with the shortcut "${App.SHORTCUT_FILE}"`, "warning")
+    } else {
+      await rename(process.execPath, App.FILE);
+      log(`Please restart the app with the file "${App.DESKTOP_ENTRY_FILE}"`, "warning")
+    }
+
+    await Process.stop();
+  }
+
+  private static async checkUpdates() {
+    await tryCatch(async () => {
+      const updateFile = App.FILE + ".update";
+      if (await exists(updateFile)) {
+        await copyFile(updateFile, App.FILE);
+        await unlink(updateFile);
+        log("Update applied. Restarting...", "info");
+        spawn(App.FILE, process.argv.slice(1), { stdio: "inherit" });
+        process.exit(0);
+      }
+
+      const res = await fetch(App.RELEASE_URL);
+      if (!res.ok) return;
+
+      const data = (await res.json()) as { tag_name: string; assets: { name: string; browser_download_url: string }[] };
+      const latestTag = data.tag_name;
+      if (latestTag.replace(/^v/, "") === App.VERSION) return;
+
+      const assetName = IS_WIN32 ? App.NAME + ".exe" : App.NAME;
+      const asset = data.assets.find(a => { return a.name === assetName; });
+      if (!asset) {
+        log(`No download found for ${assetName} in release ${latestTag}`, "warning");
+        return;
+      }
+
+      log(`Downloading ${latestTag}...`, "info");
+      const dl = await fetch(asset.browser_download_url);
+      const buffer = Buffer.from(await dl.arrayBuffer());
+
+      if (IS_WIN32) {
+        await writeFile(updateFile, buffer);
+      } else {
+        await writeFile(App.FILE, buffer);
+      }
+
+      log(`Update ${latestTag} downloaded. Restart app to apply.`, "success");
+      await Process.stop();
+    }, "Failed to check the updates");
   }
 
   static async setup() {
-    await Tlauncher.install();
-    await Zerotier.install();
-
+    await mkdir(App.DIR, { recursive: true });
     await App.installGit();
 
     log("Initializing git credentials...", "info");
@@ -156,76 +213,18 @@ export default class App {
       }
     }, "Git initialization failed");
 
+    await Tlauncher.install();
+    await Zerotier.install();
+
+    await App.moveBinnary();
     await App.createEntry();
 
     const config = await App.getConfig();
     if (config?.["installed"] !== true) {
-      log("Server successfully installed :)", "success");
+      log("Pseudo-Server successfully installed :)", "success");
       await App.putConfig({ installed: true });
     }
+
+    await App.checkUpdates();
   }
-
-  // static async ensureInstallation() {
-  //   if (!process.pkg) return;
-  //   const currentPath = normalize(process.execPath).toLowerCase();
-  //   const appFile = normalize(App.FILE).toLowerCase();
-  //   if (currentPath === appFile) return;
-
-  //   await tryCatch(async () => {
-  //     await mkdir(App.DIR, { recursive: true });
-  //     await copyFile(process.execPath, App.FILE);
-
-  //     if (IS_WIN32) {
-  //       spawn("cmd", [
-  //         "/c",
-  //         `timeout /t 3 /nobreak > nul & del /f /q "${process.execPath}" & start "" /min "${App.FILE}"`,
-  //       ], { detached: true, stdio: "ignore" });
-  //     } else {
-  //       unlink(process.execPath).catch(() => { });
-  //       spawn(App.FILE, process.argv.slice(1), { stdio: "inherit" });
-  //     }
-  //     process.exit(0);
-  //   }, "Failed to install app");
-  // }
-
-  // static async checkForUpdates() {
-  //   await tryCatch(async () => {
-  //     const updateFile = App.FILE + ".update";
-  //     if (await exists(updateFile)) {
-  //       await copyFile(updateFile, App.FILE);
-  //       await unlink(updateFile);
-  //       log("Update applied. Restarting...", "info");
-  //       spawn(App.FILE, process.argv.slice(1), { stdio: "inherit" });
-  //       process.exit(0);
-  //     }
-
-  //     const res = await fetch(`https://api.github.com/repos/${App.GITHUB}/releases/latest`);
-  //     if (!res.ok) return;
-
-  //     const data = (await res.json()) as { tag_name: string; assets: Array<{ name: string; browser_download_url: string }> };
-  //     const latestTag = data.tag_name;
-  //     if (latestTag.replace(/^v/, "") === App.VERSION) return;
-
-  //     const assetName = IS_WIN32 ? App.NAME + ".exe" : App.NAME;
-  //     const asset = data.assets.find(a => a.name === assetName);
-  //     if (!asset) {
-  //       log(`No download found for ${assetName} in release ${latestTag}`, "warning");
-  //       return;
-  //     }
-
-  //     log(`Downloading ${latestTag}...`, "info");
-  //     const dl = await fetch(asset.browser_download_url);
-  //     const buffer = Buffer.from(await dl.arrayBuffer());
-
-  //     if (IS_WIN32) {
-  //       await writeFile(updateFile, buffer);
-  //       log(`Update ${latestTag} downloaded. Restart app to apply.`, "success");
-  //     } else {
-  //       await writeFile(App.FILE, buffer);
-  //       log(`Updated to ${latestTag}. Restarting...`, "success");
-  //       spawn(App.FILE, process.argv.slice(1), { stdio: "inherit" });
-  //       process.exit(0);
-  //     }
-  //   }, "Failed to check for updates", true);
-  // }
 }
