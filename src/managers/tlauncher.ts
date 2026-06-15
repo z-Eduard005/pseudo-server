@@ -131,9 +131,7 @@ export default class Tlauncher {
   }
 
   static async install() {
-    if (await exists(MC_DIR)) {
-      return;
-    }
+    if (await exists(MC_DIR)) return;
 
     log(
       `This server works only with legacy-launcher${IS_WIN32 ? "\nInstall tlauncher first (from opening link) and try later..." : " and steam-proton setup\nInstalling using 'github.com/z-Eduard005/fedora-mc-installer' script..."}`, "warning"

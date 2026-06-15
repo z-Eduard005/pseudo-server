@@ -6,15 +6,10 @@ import JDK from "./managers/jdk";
 import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
-import App from "./managers/app";
-import Setup from "./managers/setup";
 
 tryCatch(
   async () => {
     await Process.init();
-
-    await Setup.ensure();
-    await App.checkForUpdates();
 
     while (true) {
       const { value: option, cancelled } = await UI.menu([

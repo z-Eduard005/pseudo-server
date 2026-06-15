@@ -102,9 +102,7 @@ export default class Zerotier {
 
   static async install() {
     await tryCatch(async () => {
-      if (await exists(Zerotier.FILE)) {
-        return;
-      }
+      if (await exists(Zerotier.FILE)) return;
 
       log("Installing zerotier...", "info");
       if (IS_WIN32) {
