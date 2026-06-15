@@ -6,10 +6,12 @@ import JDK from "./managers/jdk";
 import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
+import App from "./managers/app";
 
 tryCatch(
   async () => {
     await Process.init();
+    await App.setup();
 
     while (true) {
       const { value: option, cancelled } = await UI.menu([
@@ -59,10 +61,8 @@ tryCatch(
     Zerotier.getIP();
 
     await Tlauncher.initCustomVersion();
-
     await Tlauncher.initSettings();
     await Tlauncher.chooseCustomVersion();
-
     Tlauncher.launch();
 
     await Hosting.startMonitoring();
@@ -70,7 +70,6 @@ tryCatch(
     await World.init();
 
     await JDK.generateServerSettings(Zerotier.ip!);
-
     await JDK.start();
 
     JDK.process?.on("error", async (err) => {
