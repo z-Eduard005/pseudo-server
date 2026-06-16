@@ -1,6 +1,5 @@
 import { join, basename, normalize } from "path";
 import { copyFile, readFile, writeFile, mkdir, rename, rm } from "fs/promises";
-import { spawn } from "child_process";
 import {
   IS_WIN32,
   DESKTOP_DIR,
@@ -23,7 +22,7 @@ type GithubRelease = {
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
   static readonly NAME = "Pseudo-Server";
-  private static readonly VERSION = "0.0.7";
+  private static readonly VERSION = "0.0.10";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
@@ -161,12 +160,7 @@ export default class App {
 
     if (IS_WIN32) {
       if (await exists(App.FILE)) await rm(App.FILE, { force: true });
-      await copyFile(process.execPath, App.FILE);
-
-      spawn("cmd", [
-        "/c",
-        `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}"`,
-      ], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+      await rename(process.execPath, App.FILE);
       log(`Please restart the app with the shortcut "${App.SHORTCUT_FILE}"`, "warning")
     } else {
       await rename(process.execPath, App.FILE);
@@ -194,15 +188,8 @@ export default class App {
       const dl = await fetch(asset!.browser_download_url);
       const buffer = Buffer.from(await dl.arrayBuffer());
 
-      if (IS_WIN32) {
-        await writeFile(`${App.FILE}.update`, buffer);
-        spawn("cmd", [
-          "/c",
-          `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}" & move /y "${App.FILE}.update" "${App.FILE}"`,
-        ], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-      } else {
-        await writeFile(App.FILE, buffer);
-      }
+      if (IS_WIN32) await rename(App.FILE, `${App.FILE}.old`);
+      await writeFile(App.FILE, buffer);
 
       log("Update downloaded. Restart app to apply.", "success");
       await Process.stop();

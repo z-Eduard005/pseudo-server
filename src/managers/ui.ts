@@ -34,7 +34,11 @@ export default class UI {
     const TITLE_WIDTH = 50;
     const stdin = process.stdin;
 
-    stdin.setRawMode(true);
+    try {
+      stdin.setRawMode(true);
+    } catch {
+      // Windows: setRawMode may throw when toggled rapidly
+    }
     stdin.resume();
     stdin.setEncoding("utf8");
 
@@ -100,7 +104,11 @@ export default class UI {
     const cleanup = () => {
       process.stdout.removeListener("resize", renderFrame);
       stdin.removeListener("data", handleKey);
-      stdin.setRawMode(false);
+      try {
+        stdin.setRawMode(false);
+      } catch {
+        // Windows: setRawMode may throw when toggled rapidly
+      }
       stdin.pause();
       process.stdout.write("\x1B[?1049l\x1B[?25h");
     };
@@ -148,7 +156,7 @@ export default class UI {
           resolve({ value: null, cancelled: true });
           return;
         }
-        if (key === "\r") {
+        if (key === "\r" || key === "\r\n") {
           cleanup();
           resolve({ value: items[selectedIndex]!, cancelled: false });
           return;
@@ -235,7 +243,7 @@ export default class UI {
           resolve({ value, cancelled: true });
           return;
         }
-        if (key === "\r") {
+        if (key === "\r" || key === "\r\n") {
           if (getError()) {
             triedSubmit = true;
             rerender();
