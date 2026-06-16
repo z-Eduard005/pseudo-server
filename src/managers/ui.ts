@@ -148,7 +148,7 @@ export default class UI {
           resolve({ value: null, cancelled: true });
           return;
         }
-        if (key === "\r" || key === "\n") {
+        if (key === "\r") {
           cleanup();
           resolve({ value: items[selectedIndex]!, cancelled: false });
           return;
@@ -235,7 +235,7 @@ export default class UI {
           resolve({ value, cancelled: true });
           return;
         }
-        if (key === "\r" || key === "\n") {
+        if (key === "\r") {
           if (getError()) {
             triedSubmit = true;
             rerender();

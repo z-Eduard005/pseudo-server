@@ -1,5 +1,5 @@
 import { join, basename, normalize } from "path";
-import { copyFile, readFile, writeFile, mkdir, rename } from "fs/promises";
+import { copyFile, readFile, writeFile, mkdir, rename, rm } from "fs/promises";
 import { spawn } from "child_process";
 import {
   IS_WIN32,
@@ -23,7 +23,7 @@ type GithubRelease = {
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
   static readonly NAME = "Pseudo-Server";
-  private static readonly VERSION = "1.0.1";
+  private static readonly VERSION = "0.0.7";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
@@ -63,7 +63,7 @@ export default class App {
 
   private static isInstalled(pkg: string) {
     return isSuccess(() => {
-      return run(IS_WIN32 ? "where" : "which" + " " + pkg, { inherit: true });
+      return run(IS_WIN32 ? `where ${pkg}` : `which ${pkg}`);
     });
   };
 
@@ -127,7 +127,7 @@ export default class App {
             $WshShell = New-Object -ComObject WScript.Shell
             $Shortcut = $WshShell.CreateShortcut('${App.SHORTCUT_FILE}')
             $Shortcut.TargetPath = 'powershell'
-            $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${App.FILE}'' -Verb RunAs -WindowStyle Hidden"'
+            $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${App.FILE}'' -Verb RunAs -WindowStyle Normal"'
             $Shortcut.WorkingDirectory = '${App.DIR}'
             $Shortcut.IconLocation = '${App.ICON_FILE},0'
             $Shortcut.Description = '${App.NAME}'
@@ -137,7 +137,7 @@ export default class App {
         });
 
         await copyFile(App.SHORTCUT_FILE, join(DESKTOP_DIR, basename(App.SHORTCUT_FILE)));
-      } else {
+      } else if (!IS_WIN32) {
         await writeFile(
           App.DESKTOP_ENTRY_FILE,
           `[Desktop Entry]
@@ -160,6 +160,9 @@ export default class App {
     if (processPath === appFile) return;
 
     if (IS_WIN32) {
+      if (await exists(App.FILE)) await rm(App.FILE, { force: true });
+      await copyFile(process.execPath, App.FILE);
+
       spawn("cmd", [
         "/c",
         `timeout /t 5 /nobreak > nul & del /f /q "${process.execPath}"`,
@@ -208,21 +211,20 @@ export default class App {
 
   static async setup() {
     await mkdir(App.DIR, { recursive: true });
-    await App.installGit();
+    log(`${App.NAME} verion - ${App.VERSION}`, "info")
+    await App.createEntry();
+    await App.moveBinnary();
 
+    await App.installGit();
     await tryCatch(async () => {
       for (const field of ["name", "email"]) {
-        if (!(await run(`git config --global user.${field}`))) {
-          await run(`git config --global user.${field} "you@example.com"`);
-        }
+        const exists = await isSuccess(() => run(`git config --global user.${field}`));
+        if (!exists) await run(`git config --global user.${field} "you@example.com"`);
       }
     }, "Git initialization failed");
 
     await Tlauncher.install();
     await Zerotier.install();
-
-    await App.createEntry();
-    await App.moveBinnary();
 
     const config = await App.getConfig();
     if (config?.["installed"] !== true) {

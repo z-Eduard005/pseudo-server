@@ -26,5 +26,6 @@ if (releases.length > 5) {
   console.log(`Cleaning up ${old.length} old release(s)...`);
   for (const r of old) {
     execSync(`gh release delete ${r.tagName} --yes`, { stdio: "inherit" });
+    execSync(`git push --delete origin ${r.tagName}`, { stdio: "inherit" });
   }
 }
