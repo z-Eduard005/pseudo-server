@@ -28,7 +28,6 @@ export default class App {
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
   private static readonly CONFIG_FILE = join(App.DIR, "config.json");
-  private static readonly DEFAULT_LINUX_TERM = "ptyxis";
   private static readonly GIT_PACKAGES = IS_WIN32 ? ["Git.Git", "GitHub.cli"] : ["git", "gh"];
   private static readonly ICON_FILE = join(App.DIR, IS_WIN32 ? "icon.ico" : "icon.png");
   private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
@@ -64,7 +63,7 @@ export default class App {
 
   private static isInstalled(pkg: string) {
     return isSuccess(() => {
-      return run(IS_WIN32 ? "where" : "which" + pkg, { inherit: true });
+      return run(IS_WIN32 ? "where" : "which" + " " + pkg, { inherit: true });
     });
   };
 
@@ -143,9 +142,9 @@ export default class App {
           App.DESKTOP_ENTRY_FILE,
           `[Desktop Entry]
           Name=${App.NAME}
-          Exec=${App.DEFAULT_LINUX_TERM} -- ${LINUX_SHELL} -lc "DRI_PRIME=1 ${App.FILE}"
+          Exec=${LINUX_SHELL} -lc "DRI_PRIME=1 ${App.FILE}"
+          Terminal=true
           Type=Application
-          Terminal=false
           Icon=${App.ICON_FILE}
           Categories=Application;`,
           "utf8"
@@ -211,7 +210,6 @@ export default class App {
     await mkdir(App.DIR, { recursive: true });
     await App.installGit();
 
-    log("Initializing git credentials...", "info");
     await tryCatch(async () => {
       for (const field of ["name", "email"]) {
         if (!(await run(`git config --global user.${field}`))) {

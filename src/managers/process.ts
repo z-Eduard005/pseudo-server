@@ -69,12 +69,8 @@ export default class Process {
 
     if (Hosting.ip === Zerotier.ip && World.initialized) {
       await tryCatch(
-        () => {
-          return World.sync();
-        },
-        (err) => {
-          return log(err, "error");
-        }
+        () => World.sync(),
+        err => log(err, "error")
       );
     }
     Hosting.disableKeepAlive();
