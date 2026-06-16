@@ -1,0 +1,30 @@
+const { execSync } = require("child_process");
+const fs = require("fs");
+
+const file = "src/managers/app.ts";
+const content = fs.readFileSync(file, "utf8");
+const match = content.match(
+  /private static readonly VERSION = "(\d+\.\d+\.\d+)"/,
+);
+
+if (!match) {
+  console.error("Failed to read version from app.ts");
+  process.exit(1);
+}
+
+const version = match[1];
+execSync(
+  `gh release create v${version} build/Pseudo-Server.exe build/Pseudo-Server --title "v${version}" --notes ""`,
+  { stdio: "inherit" },
+);
+
+const releases = JSON.parse(
+  execSync("gh release list -L 10 --json tagName", { encoding: "utf8" }),
+);
+if (releases.length > 5) {
+  const old = releases.slice(5);
+  console.log(`Cleaning up ${old.length} old release(s)...`);
+  for (const r of old) {
+    execSync(`gh release delete ${r.tagName} --yes`, { stdio: "inherit" });
+  }
+}

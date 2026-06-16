@@ -11,3 +11,5 @@ Start the binary, pick an option:
 - **Join New Server** — paste an encoded string from the admin to add a server to your list
 
 **Completely free** Everything runs on your machine. No servers to rent, no subscriptions, no hidden costs.
+
+[Download Link](https://z-eduard005.github.io/pseudo-server/)

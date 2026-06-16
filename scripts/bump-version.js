@@ -1,20 +1,36 @@
 const fs = require("fs");
+const readline = require("readline");
 
 const file = "src/managers/app.ts";
-let content = fs.readFileSync(file, "utf8");
+const content = fs.readFileSync(file, "utf8");
 const match = content.match(
-  /private static readonly VERSION = "(\d+\.\d+\.)(\d+)"/,
+  /private static readonly VERSION = "(\d+\.\d+\.\d+)"/,
 );
+const current = match ? match[1] : "unknown";
 
-if (match) {
-  const newPatch = Number(match[2]) + 1;
-  const newVersion = match[1] + newPatch;
-  content = content.replace(
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+rl.question(`Current version: ${current}\nNew version: `, (input) => {
+  const trimmed = input.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(trimmed)) {
+    console.log("Invalid format — use X.Y.Z");
+    rl.close();
+    process.exit(1);
+  }
+
+  const [c0 = 0, c1 = 0, c2 = 0] = current.split(".").map(Number);
+  const [n0 = 0, n1 = 0, n2 = 0] = trimmed.split(".").map(Number);
+  const isNewer = n0 > c0 || (n0 === c0 && n1 > c1) || (n0 === c0 && n1 === c1 && n2 > c2);
+  if (!isNewer) {
+    console.log("New version must be greater than current version");
+    rl.close();
+    process.exit(1);
+  }
+
+  const newContent = content.replace(
     /private static readonly VERSION = "\d+\.\d+\.\d+"/,
-    `private static readonly VERSION = "${newVersion}"`,
+    `private static readonly VERSION = "${trimmed}"`,
   );
-  fs.writeFileSync(file, content);
-  console.log(`Bumped to ${newVersion}`);
-} else {
-  console.error("Failed to bump version: VERSION pattern not found.");
-}
+  fs.writeFileSync(file, newContent);
+  console.log(`Bumped to ${trimmed}`);
+  rl.close();
+});

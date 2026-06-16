@@ -23,7 +23,7 @@ type GithubRelease = {
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
   static readonly NAME = "Pseudo-Server";
-  private static readonly VERSION = "0.0.0";
+  private static readonly VERSION = "1.0.1";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
@@ -34,6 +34,12 @@ export default class App {
   private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
   private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
   private static readonly DESKTOP_ENTRY_FILE = join(App.DESKTOP_ENTRY_PATH, App.NAME + ".desktop");
+
+  private static isNewerVersion(releaseTag: string): boolean {
+    const [r0 = 0, r1 = 0, r2 = 0] = releaseTag.replace(/^v/, "").split(".").map(Number);
+    const [c0 = 0, c1 = 0, c2 = 0] = App.VERSION.split(".").map(Number);
+    return r0 > c0 || (r0 === c0 && r1 > c1) || (r0 === c0 && r1 === c1 && r2 > c2);
+  }
 
   private static async getConfig(): Promise<Record<string, unknown> | undefined> {
     if (!(await exists(App.CONFIG_FILE))) return;
@@ -174,7 +180,7 @@ export default class App {
       if (!res.ok) return;
 
       const release = (await res.json()) as GithubRelease;
-      if (release.tag_name.replace(/^v/, "") === App.VERSION) return;
+      if (!App.isNewerVersion(release.tag_name)) return;
 
       const assetName = IS_WIN32 ? App.NAME + ".exe" : App.NAME;
       const asset = release.assets.find(a => { return a.name === assetName; });
