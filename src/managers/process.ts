@@ -5,6 +5,7 @@ import Zerotier from "./zerotier";
 import World from "./world";
 import JDK from "./jdk";
 import Hosting from "./hosting";
+import UI from "./ui";
 
 export default class Process {
   private static closing = false;
@@ -36,8 +37,14 @@ export default class Process {
       throwErr("Apologies, this program currently only works on Windows or Fedora Linux.");
     }
 
-    process.on("uncaughtException", err => throwErr("Uncaught Exception: " + err));
-    process.on("unhandledRejection", reason => throwErr("Unhandled Rejection: " + reason));
+    process.on("uncaughtException", err => {
+      UI.restoreMainScreen();
+      throwErr("Uncaught Exception: " + err);
+    });
+    process.on("unhandledRejection", reason => {
+      UI.restoreMainScreen();
+      throwErr("Unhandled Rejection: " + reason);
+    });
   };
 
   static async pause() {
@@ -59,6 +66,7 @@ export default class Process {
   static async stop(successLog?: string) {
     if (Process.closing) return;
     Process.closing = true;
+    UI.restoreMainScreen();
 
     World.disableRepeatedPush();
     await JDK.kill();
@@ -76,7 +84,7 @@ export default class Process {
     if (successLog) log(successLog, "success");
 
     await Process.pause();
-    try { process.stdin.setRawMode(false); } catch {}
+    try { process.stdin.setRawMode(false); } catch { }
     process.exit(0);
   }
 }

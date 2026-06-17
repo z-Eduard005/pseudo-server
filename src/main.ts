@@ -20,9 +20,7 @@ tryCatch(
         "Add New Server",
       ], UI.START_ART, "Choose an option:", "Exit");
 
-      if (cancelled) {
-        await Process.stop();
-      }
+      if (cancelled) await Process.stop();
 
       if (option === "Create Server Instance") {
         let serverName = "";
@@ -51,6 +49,7 @@ tryCatch(
       if (option === "Choose Server") continue;
       if (option === "Add New Server") continue;
     }
+    UI.restoreMainScreen();
 
     JDK.getRam();
 
@@ -97,6 +96,7 @@ tryCatch(
     });
   },
   async (err) => {
+    UI.restoreMainScreen();
     log(err, "error");
     await Process.stop();
   }

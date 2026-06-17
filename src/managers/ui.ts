@@ -4,6 +4,7 @@ type Render = (draw: () => string, handleKey: (key: string) => void, title?: str
 };
 
 export default class UI {
+  private static altScreen = false;
   private static readonly PADDING = 1;
   private static readonly BG = "\x1B[48;5;235m";
   private static readonly FG = "\x1B[38;5;255m";
@@ -30,6 +31,16 @@ export default class UI {
     return lines;
   }
 
+  static createAltScreen() {
+    process.stdout.write("\x1B[?25l\x1B[?1049h");
+    UI.altScreen = true;
+  }
+
+  static restoreMainScreen() {
+    if (UI.altScreen) process.stdout.write("\x1B[?1049l\x1B[?25h");
+    UI.altScreen = false;
+  }
+
   private static render: Render = (draw, handleKey, title, desc, backText) => {
     const TITLE_WIDTH = 50;
     const stdin = process.stdin;
@@ -38,7 +49,7 @@ export default class UI {
     stdin.resume();
     stdin.setEncoding("utf8");
 
-    process.stdout.write("\x1B[?25l\x1B[?1049h");
+    UI.createAltScreen();
 
     const renderFrame = () => {
       const c = UI.cols();
@@ -100,7 +111,6 @@ export default class UI {
     const cleanup = () => {
       process.stdout.removeListener("resize", renderFrame);
       stdin.removeListener("data", handleKey);
-      process.stdout.write("\x1B[?1049l\x1B[?25h");
     };
 
     return { cleanup, rerender: renderFrame };
