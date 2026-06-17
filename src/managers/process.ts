@@ -33,35 +33,31 @@ export default class Process {
     } else if (await Process.isFedora()) {
       await run("sudo -v", { inherit: true });
     } else {
-      throwErr("Sorry, this program works only on Windows or Fedora Linux")
+      throwErr("Apologies, this program currently only works on Windows or Fedora Linux.");
     }
 
-    process.on("uncaughtException", (err) => {
-      return throwErr("Uncaught Exception: " + err);
-    });
-    process.on("unhandledRejection", (reason) => {
-      return throwErr("Unhandled Rejection: " + reason);
-    });
+    process.on("uncaughtException", err => throwErr("Uncaught Exception: " + err));
+    process.on("unhandledRejection", reason => throwErr("Unhandled Rejection: " + reason));
   };
 
   static async pause() {
-    await new Promise<void>((resolve) => {
-      const rl = createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
+    await new Promise<void>(async (resolve) => {
+      await tryCatch(() => {
+        const rl = createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
 
-      rl.question(color("Press button to continue...", "warning"), () => {
-        rl.close();
-        resolve();
-      });
+        rl.question(color("Press button to continue...", "warning"), () => {
+          rl.close();
+          resolve();
+        });
+      }, "Error while pausing the app", true);
     });
   }
 
   static async stop(successLog?: string) {
-    if (Process.closing) {
-      return;
-    }
+    if (Process.closing) return;
     Process.closing = true;
 
     World.disableRepeatedPush();
@@ -77,9 +73,7 @@ export default class Process {
 
     await Zerotier.leaveNetwork();
 
-    if (successLog) {
-      log(successLog, "success");
-    }
+    if (successLog) log(successLog, "success");
 
     await Process.pause();
     process.exit(0);

@@ -18,8 +18,8 @@ export default class Hosting {
   private static staleTimer: NodeJS.Timeout | undefined;
   private static confirmTimer: NodeJS.Timeout | undefined;
   private static hostFound = false;
-  private static ip: string | null = null
   private static resolve: () => void;
+  static ip: string | null = null
 
   static startMonitoring(): Promise<void> {
     return new Promise(async (resolve) => {

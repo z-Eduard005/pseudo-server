@@ -21,7 +21,7 @@ export default class Zerotier {
   private static readonly CMD_TIMEOUT = 4000;
 
   static readonly START_IP = "10.242";
-  private static ip: string | null = null;
+  static ip: string | null = null;
 
   private static async setupSudoers() {
     log("Setting up sudo privileges for Zerotier...", "info")

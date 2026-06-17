@@ -111,6 +111,7 @@ export default class UI {
       }
       stdin.pause();
       process.stdout.write("\x1B[?1049l\x1B[?25h");
+      process.stdout.write("");
     };
 
     return { cleanup, rerender: renderFrame };

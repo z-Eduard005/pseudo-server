@@ -15,7 +15,7 @@ export default class JDK {
     "https://github.com/AdoptOpenJDK/openjdk8-binaries/releases/download/jdk8u292-b10/OpenJDK8U-jdk_x64_linux_hotspot_8u292b10.tar.gz";
   private static readonly DOWNLOAD_FILENAME = "jdk8u292-b10.tar.gz";
   private static readonly SERVER_PROPS_FILE = join(App.DIR, "server.properties");
-  private static readonly FILE = IS_WIN32
+  static readonly FILE = IS_WIN32
     ? join("C:", "Program Files", "AdoptOpenJDK", "jdk-8.0.292.10-hotspot", "bin", "java.exe")
     : join(JDK.PATH, "bin", "java");
 
@@ -23,8 +23,8 @@ export default class JDK {
   private static readonly MAX_RAM_MB = 7168;
   private static readonly MAX_RAM_PERCENTAGE = 0.4;
   static readonly PORT = "25565";
-  private static ram = JDK.MIN_RAM_MB;
-  private static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
+  static ram = JDK.MIN_RAM_MB;
+  static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 
   static async start() {
     log("Server is loading...", "info");
