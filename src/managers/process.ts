@@ -14,7 +14,7 @@ export default class Process {
     const isAdmin = await isSuccess(() => run("net session"));
     if (isAdmin) return;
 
-    throwErr(`You don't have admin rights!\nPlease start the program as an admin`)
+    throwErr(`You don't have admin rights!\nPlease start the program as an admin`);
   }
 
   private static async isFedora() {
@@ -45,6 +45,12 @@ export default class Process {
       UI.restoreMainScreen();
       throwErr("Unhandled Rejection: " + reason);
     });
+
+    const { emitWarning } = process;
+    process.emitWarning = (warning, ...args) => {
+      if (args[0] === 'ExperimentalWarning') return;
+      return emitWarning(warning, ...args as (NodeJS.EmitWarningOptions | undefined)[]);
+    };
   };
 
   static async pause() {
