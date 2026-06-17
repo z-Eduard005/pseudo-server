@@ -21,11 +21,7 @@ export default class Zerotier {
   private static readonly CMD_TIMEOUT = 4000;
 
   static readonly START_IP = "10.242";
-  private static _ip: string | null = null
-
-  static get ip() {
-    return this._ip;
-  }
+  private static ip: string | null = null;
 
   private static async setupSudoers() {
     log("Setting up sudo privileges for Zerotier...", "info")
@@ -84,7 +80,7 @@ export default class Zerotier {
   }
 
   static getIP() {
-    Zerotier._ip =
+    Zerotier.ip =
       Object.values(networkInterfaces())
         .flat()
         .find(
@@ -94,7 +90,7 @@ export default class Zerotier {
               interf.address.startsWith(Zerotier.START_IP);
           }
         )?.address ?? "";
-    if (!Zerotier._ip)
+    if (!Zerotier.ip)
       throwErr(
         "Zerotier ipV4 address of this device not found (try to restart the pc)"
       );

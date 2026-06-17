@@ -8,7 +8,7 @@ type BroadcastData = { type: string; ip: string }
 
 export default class Hosting {
   private static readonly BROADCAST_PORT = 42069;
-  private static readonly BROADCAST_IP = `${Zerotier.START_IP}.255.255`;
+  private static readonly BROADCASTIP = `${Zerotier.START_IP}.255.255`;
   private static readonly LISTEN_TIMEOUT = 5_000;
   private static readonly HEARTBEAT_INTERVAL = 3_000;
   private static readonly CONFIRM_TIMEOUT = 1_000;
@@ -18,12 +18,8 @@ export default class Hosting {
   private static staleTimer: NodeJS.Timeout | undefined;
   private static confirmTimer: NodeJS.Timeout | undefined;
   private static hostFound = false;
+  private static ip: string | null = null
   private static resolve: () => void;
-  private static _ip: string | null = null
-
-  static get ip() {
-    return this._ip;
-  }
 
   static startMonitoring(): Promise<void> {
     return new Promise(async (resolve) => {
@@ -41,7 +37,7 @@ export default class Hosting {
 
         if (!Hosting.hostFound) {
           Hosting.hostFound = true;
-          Hosting._ip = msg.ip;
+          Hosting.ip = msg.ip;
           const fullIP = `${msg.ip}:${JDK.PORT}`;
 
           log(`Someone is already playing on ${fullIP}`, "info");
@@ -52,7 +48,7 @@ export default class Hosting {
         } else if (Hosting.ip === Zerotier.ip && msg.ip < Zerotier.ip!) {
           clearInterval(Hosting.heartBeatTimer);
           clearTimeout(Hosting.confirmTimer);
-          Hosting._ip = msg.ip;
+          Hosting.ip = msg.ip;
           const fullIP = `${msg.ip}:${JDK.PORT}`;
 
           log(`Reconecting to new host on ${fullIP}`, "info");
@@ -76,7 +72,7 @@ export default class Hosting {
   private static becomeHost() {
     if (Hosting.ip === Zerotier.ip) return;
 
-    Hosting._ip = Zerotier.ip;
+    Hosting.ip = Zerotier.ip;
 
     clearInterval(Hosting.heartBeatTimer);
     Hosting.heartBeatTimer = setInterval(async () => {
@@ -84,7 +80,7 @@ export default class Hosting {
         () => Hosting.socket.send(
           Buffer.from(JSON.stringify({ type: "HEARTBEAT", ip: Zerotier.ip })),
           Hosting.BROADCAST_PORT,
-          Hosting.BROADCAST_IP
+          Hosting.BROADCASTIP
         ),
         "Hosting connection error (bad internet)"
 

@@ -15,7 +15,7 @@ export default class JDK {
     "https://github.com/AdoptOpenJDK/openjdk8-binaries/releases/download/jdk8u292-b10/OpenJDK8U-jdk_x64_linux_hotspot_8u292b10.tar.gz";
   private static readonly DOWNLOAD_FILENAME = "jdk8u292-b10.tar.gz";
   private static readonly SERVER_PROPS_FILE = join(App.DIR, "server.properties");
-  private static readonly _FILE = IS_WIN32
+  private static readonly FILE = IS_WIN32
     ? join("C:", "Program Files", "AdoptOpenJDK", "jdk-8.0.292.10-hotspot", "bin", "java.exe")
     : join(JDK.PATH, "bin", "java");
 
@@ -23,26 +23,14 @@ export default class JDK {
   private static readonly MAX_RAM_MB = 7168;
   private static readonly MAX_RAM_PERCENTAGE = 0.4;
   static readonly PORT = "25565";
-  private static _ram = JDK.MIN_RAM_MB;
-  private static _process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
-
-  static get FILE() {
-    return this._FILE;
-  }
-
-  static get process() {
-    return this._process;
-  }
-
-  static get ram() {
-    return this._ram;
-  }
+  private static ram = JDK.MIN_RAM_MB;
+  private static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 
   static async start() {
     log("Server is loading...", "info");
-    JDK._process = await tryCatch(() => {
+    JDK.process = await tryCatch(() => {
       return spawn(
-        JDK._FILE,
+        JDK.FILE,
         [
           `-Xmx${JDK.ram}M`,
           `-Xms${JDK.ram}M`,
@@ -57,12 +45,12 @@ export default class JDK {
         }
       );
     }, "Error while starting java server")
-    JDK._process.stdout.setEncoding("utf8");
+    JDK.process.stdout.setEncoding("utf8");
   }
 
   static runMCCommand(cmd: string) {
-    if (JDK._process?.stdin.writable) {
-      JDK._process.stdin.write(cmd + "\n");
+    if (JDK.process?.stdin.writable) {
+      JDK.process.stdin.write(cmd + "\n");
     }
   }
 
@@ -104,8 +92,8 @@ export default class JDK {
   static getRam() {
     const partOfRam = Math.floor((totalmem() / 1024 / 1024) * JDK.MAX_RAM_PERCENTAGE);
 
-    JDK._ram = partOfRam > JDK.MAX_RAM_MB ? JDK.MAX_RAM_MB : partOfRam;
-    if (JDK._ram < JDK.MIN_RAM_MB) {
+    JDK.ram = partOfRam > JDK.MAX_RAM_MB ? JDK.MAX_RAM_MB : partOfRam;
+    if (JDK.ram < JDK.MIN_RAM_MB) {
       throwErr("You don't have enough memory to play on the server :(");
     }
   }
