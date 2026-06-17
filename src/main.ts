@@ -31,13 +31,13 @@ tryCatch(
 
         while (step > 0 && step < 3) {
           if (step === 1) {
-            const { value, cancelled } = await UI.input("[1|2]: Server creation...", "Type a name for your server:", serverName || undefined);
+            const { value, cancelled } = await UI.input("[1|2]: Server creation...", "Type a name for your server:", serverName);
             if (cancelled) { step = 0; break; }
             serverName = value;
             step = 2;
           }
           if (step === 2) {
-            const { value, cancelled } = await UI.input("[2|2]: Server creation...", "Type something else:", somethingElse || undefined);
+            const { value, cancelled } = await UI.input("[2|2]: Server creation...", "Type something else:", somethingElse);
             if (cancelled) { somethingElse = value; step = 1; continue; }
             somethingElse = value;
             step = 3;
@@ -60,7 +60,6 @@ tryCatch(
     await Zerotier.joinNetwork();
     Zerotier.getIP();
 
-    await Tlauncher.initCustomVersion();
     await Tlauncher.initSettings();
     await Tlauncher.chooseCustomVersion();
     Tlauncher.launch();

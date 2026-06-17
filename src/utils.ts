@@ -9,11 +9,15 @@ export const run: Run = async (commands, options) => {
   const result: string[] = [],
     commandsArray: string[] = Array.isArray(commands) ? commands : [commands],
     spawnFn = (c: string) => {
-      return spawn(c, {
+      const child = spawn(c, {
         shell: IS_WIN32 ? true : LINUX_SHELL,
         cwd: options?.cwd,
         env: process.env
       });
+      if (options?.inherit && process.stdin.isTTY) {
+        process.stdin.pipe(child.stdin);
+      }
+      return child;
     };
 
   for (const cmd of commandsArray) {
@@ -44,6 +48,9 @@ export const run: Run = async (commands, options) => {
         });
 
         child.on("close", (code) => {
+          if (options?.inherit && process.stdin.isTTY) {
+            process.stdin.unpipe(child.stdin);
+          }
           return code === 0
             ? resolve(stdout.trim())
             : reject(
