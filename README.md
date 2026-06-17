@@ -11,5 +11,6 @@ Start the binary, pick an option:
 - **Join New Server** — paste an encoded string from the admin to add a server to your list
 
 **Completely free** Everything runs on your machine. No servers to rent, no subscriptions, no hidden costs.
+**Only limitation** is your github free plan which affect only world size. So if your world is very big (commit size bigger then 2GB or one file bigger then 100MB), github will reject pushes and your world cant be synced!
 
 [Download Link](https://z-eduard005.github.io/pseudo-server/)

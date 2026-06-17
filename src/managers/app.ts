@@ -22,7 +22,7 @@ type GithubRelease = {
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
   static readonly NAME = "Pseudo-Server";
-  private static readonly VERSION = "0.0.10";
+  private static readonly VERSION = "0.0.13";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
@@ -173,32 +173,34 @@ export default class App {
   private static async checkUpdates() {
     await tryCatch(async () => {
       const res = await fetch(App.RELEASE_URL);
-      if (!res.ok) return;
+      if (!res.ok) {
+        log(`Update check failed:\n\nstatus: ${res.status}\nstatusText: ${res.statusText}\nbody: ${res.body}`, "warning");
+        return;
+      }
 
       const release = (await res.json()) as GithubRelease;
       if (!App.isNewerVersion(release.tag_name)) return;
 
       const assetName = IS_WIN32 ? App.NAME + ".exe" : App.NAME;
-      const asset = release.assets.find(a => { return a.name === assetName; });
-      if (!asset) {
-        throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
-      }
+      const asset = release.assets.find(a => a.name === assetName);
+      if (!asset) throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
 
       log(`Downloading ${release.tag_name}...`, "info");
       const dl = await fetch(asset!.browser_download_url);
       const buffer = Buffer.from(await dl.arrayBuffer());
 
-      if (IS_WIN32) await rename(App.FILE, `${App.FILE}.old`);
-      await writeFile(App.FILE, buffer);
+      await writeFile(`${App.FILE}.tmp`, buffer);
+      await rename(`${App.FILE}.tmp`, App.FILE);
+      if (!IS_WIN32) await run(`chmod +x ${App.FILE}`);
 
-      log("Update downloaded. Restart app to apply.", "success");
+      log("Update downloaded. Please restart the app", "success");
       await Process.stop();
     }, "Failed to update the program");
   }
 
   static async setup() {
     await mkdir(App.DIR, { recursive: true });
-    log(`${App.NAME} verion - ${App.VERSION}`, "info")
+    log(`${App.NAME} v${App.VERSION}`, "info")
     await App.createEntry();
     await App.moveBinnary();
 
