@@ -76,6 +76,7 @@ export default class Process {
     if (successLog) log(successLog, "success");
 
     await Process.pause();
+    try { process.stdin.setRawMode(false); } catch {}
     process.exit(0);
   }
 }

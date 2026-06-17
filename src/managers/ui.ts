@@ -34,11 +34,7 @@ export default class UI {
     const TITLE_WIDTH = 50;
     const stdin = process.stdin;
 
-    try {
-      stdin.setRawMode(true);
-    } catch {
-      // Windows: setRawMode may throw when toggled rapidly
-    }
+    try { stdin.setRawMode(true); } catch { };
     stdin.resume();
     stdin.setEncoding("utf8");
 
@@ -104,14 +100,7 @@ export default class UI {
     const cleanup = () => {
       process.stdout.removeListener("resize", renderFrame);
       stdin.removeListener("data", handleKey);
-      try {
-        stdin.setRawMode(false);
-      } catch {
-        // Windows: setRawMode may throw when toggled rapidly
-      }
-      stdin.pause();
       process.stdout.write("\x1B[?1049l\x1B[?25h");
-      process.stdout.write("");
     };
 
     return { cleanup, rerender: renderFrame };
