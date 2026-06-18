@@ -77,9 +77,7 @@ export const isSuccess = async (fn: () => unknown) => {
 };
 
 export const exists = (path: string) => {
-  return isSuccess(async () => {
-    return await access(path, constants.F_OK);
-  });
+  return isSuccess(async () => await access(path, constants.F_OK));
 };
 
 export const retryRun = async <Return>(fn: () => Return | Promise<Return>) => {

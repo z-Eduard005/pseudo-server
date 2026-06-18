@@ -11,7 +11,7 @@ export default class Process {
   private static closing = false;
 
   private static async ensureAdmin() {
-    const isAdmin = await isSuccess(() => run("net session"));
+    const isAdmin = await isSuccess(async () => await run("net session"));
     if (isAdmin) return;
 
     throwErr(`You don't have admin rights!\nPlease start the program as an admin`);

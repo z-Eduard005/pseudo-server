@@ -6,10 +6,11 @@ import {
   LINUX_SHELL,
   USER_DIR,
 } from "../constants";
-import { run, retryRun, log, throwErr, tryCatch, isSuccess, sudo, exists } from "../utils";
+import { run, retryRun, log, throwErr, tryCatch, exists } from "../utils";
 import Zerotier from "./zerotier";
 import Tlauncher from "./tlauncher";
 import Process from "./process";
+import GH from "./gh";
 
 type GithubRelease = {
   tag_name: string;
@@ -22,12 +23,11 @@ type GithubRelease = {
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
   static readonly NAME = "Pseudo-Server";
-  private static readonly VERSION = "0.0.13";
+  private static readonly VERSION = "0.0.15";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
   private static readonly CONFIG_FILE = join(App.DIR, "config.json");
-  private static readonly GIT_PACKAGES = IS_WIN32 ? ["Git.Git", "GitHub.cli"] : ["git", "gh"];
   private static readonly ICON_FILE = join(App.DIR, IS_WIN32 ? "icon.ico" : "icon.png");
   private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
   private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
@@ -58,56 +58,6 @@ export default class App {
       },
       "Failed to write config file"
     );
-  }
-
-  private static isInstalled(pkg: string) {
-    return isSuccess(() => {
-      return run(IS_WIN32 ? `where ${pkg}` : `which ${pkg}`);
-    });
-  };
-
-  private static async installGit() {
-    if (await App.isInstalled("git") && await App.isInstalled("gh")) {
-      return;
-    }
-    log("Installing dependencies...", "info");
-
-    if (IS_WIN32) {
-      if (!(await App.isInstalled("winget"))) {
-        await tryCatch(
-          () => {
-            return retryRun(() => {
-              return run(
-                [
-                  'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"',
-                  'powershell -Command "Install-Script winget-install -Force"',
-                  'powershell -Command "winget-install"',
-                ],
-                { inherit: true }
-              );
-            });
-          },
-          "Winget is not installed"
-        );
-        if (!(await App.isInstalled("winget"))) {
-          throwErr("Winget is not installed");
-        }
-      }
-
-      await tryCatch(
-        () => {
-          return run(`winget install ${App.GIT_PACKAGES.join(" ")}`, { inherit: true });
-        },
-        "Git packages are not installed, this might have happened earlier",
-        true
-      );
-    } else {
-      await tryCatch(
-        async () => {
-          await run(sudo(`dnf install -y ${App.GIT_PACKAGES.join(" ")}`), { inherit: true });
-        }, "Error while installing git"
-      )
-    }
   }
 
   private static async createEntry() {
@@ -204,16 +154,11 @@ export default class App {
     await App.createEntry();
     await App.moveBinnary();
 
-    await App.installGit();
-    await tryCatch(async () => {
-      for (const field of ["name", "email"]) {
-        const exists = await isSuccess(() => run(`git config --global user.${field}`));
-        if (!exists) await run(`git config --global user.${field} "you@example.com"`);
-      }
-    }, "Git initialization failed");
-
     await Tlauncher.install();
     await Zerotier.install();
+
+    await GH.installGit();
+    await GH.ensureAuth();
 
     const config = await App.getConfig();
     if (config?.["installed"] !== true) {
