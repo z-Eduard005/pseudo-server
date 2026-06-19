@@ -122,16 +122,17 @@ export default class UI {
       const termHeight = process.stdout.rows || 24;
       const topPadding = Math.max(0, Math.floor((termHeight - 1 - contentLines.length) / 2));
 
-      process.stdout.write("\x1B[2J\x1B[H");
-      process.stdout.write(backLine);
+      let frame = "\x1B[?2026h\x1B[2J\x1B[H";
+      frame += backLine;
       if (action) {
         const actionText = `${action.label} (Ctrl+O)`;
-        process.stdout.write(`\x1B[${c - actionText.length + 1}G\x1B[2m${actionText}\x1B[22m`);
+        frame += `\x1B[${c - actionText.length + 1}G\x1B[2m${actionText}\x1B[22m`;
       }
-      process.stdout.write("\n");
-      process.stdout.write("\n".repeat(topPadding));
-      process.stdout.write(contentLines.join("\n"));
-      process.stdout.write("\n\n");
+      frame += "\n";
+      frame += "\n".repeat(topPadding);
+      frame += contentLines.join("\n");
+      frame += "\n\n\x1B[?2026l";
+      process.stdout.write(frame);
     };
 
     renderFrame();
