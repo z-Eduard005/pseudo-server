@@ -2,7 +2,7 @@ import { IS_WIN32, USER_DIR } from "../constants";
 import { color, isSuccess, log, run, throwErr, tryCatch } from "../utils";
 import { createInterface } from "readline";
 import Zerotier from "./zerotier";
-import World from "./world";
+import Git from "./git";
 import JDK from "./jdk";
 import Hosting from "./hosting";
 import UI from "./ui";
@@ -74,12 +74,12 @@ export default class Process {
     Process.closing = true;
     UI.restoreMainScreen();
 
-    World.disableRepeatedPush();
+    Git.worldDisableRepeatedPush();
     await JDK.kill();
 
-    if (Hosting.ip === Zerotier.ip && World.initialized) {
+    if (Hosting.ip === Zerotier.ip && Git.worldInitialized) {
       await tryCatch(
-        () => World.sync(),
+        () => Git.worldSync(),
         err => log(err, "error")
       );
     }

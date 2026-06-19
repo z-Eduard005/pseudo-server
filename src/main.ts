@@ -1,7 +1,7 @@
 import { log, tryCatch, throwErr } from "./utils";
 import UI from "./managers/ui";
 import Zerotier from "./managers/zerotier";
-import World from "./managers/world";
+import Git from "./managers/git";
 import JDK from "./managers/jdk";
 import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
@@ -65,7 +65,7 @@ tryCatch(
 
     await Hosting.startMonitoring();
 
-    await World.init();
+    await Git.worldInit();
 
     await JDK.generateServerSettings(Zerotier.ip!);
     await JDK.start();
@@ -91,7 +91,7 @@ tryCatch(
       if (data.includes("Unloading dimension 1")) {
         log(`You have started the server on port: ${Zerotier.ip}:${JDK.PORT}\nHave fun playing :)`, "success");
 
-        World.enableRepeatedPush();
+        Git.worldEnableRepeatedPush();
       }
     });
   },
