@@ -1,4 +1,27 @@
-type Render = (draw: () => string, handleKey: (key: string) => void, title?: string, desc?: string, backText?: string) => {
+type LayoutOptions = {
+  title?: string;
+  desc?: string;
+  backText?: string;
+  action?: { label: string; run: () => void };
+}
+
+type InputOptions = LayoutOptions & {
+  defaultValue?: string;
+  maxLen?: number;
+  filter?: RegExp;
+}
+
+type MenuOptions = LayoutOptions & {
+  refresh?: () => Promise<string[]>;
+}
+
+type UIReturn = { value: string; cancelled: boolean };
+
+type Render = (
+  draw: () => string,
+  handleKey: (key: string) => void,
+  layoutOptions?: LayoutOptions
+) => {
   cleanup: () => void;
   rerender: () => void;
 };
@@ -37,11 +60,16 @@ export default class UI {
   }
 
   static restoreMainScreen() {
-    if (UI.altScreen) process.stdout.write("\x1B[?1049l\x1B[?25h");
-    UI.altScreen = false;
+    if (UI.altScreen) {
+      process.stdout.removeAllListeners("resize");
+      process.stdin.removeAllListeners("data");
+      try { process.stdin.setRawMode(false); } catch { }
+      process.stdout.write("\x1B[?1049l\x1B[?25h");
+      UI.altScreen = false;
+    }
   }
 
-  private static render: Render = (draw, handleKey, title, desc, backText) => {
+  private static render: Render = (draw, handleKey, { title, desc, backText, action } = {}) => {
     const TITLE_WIDTH = 50;
     const stdin = process.stdin;
 
@@ -80,11 +108,9 @@ export default class UI {
       }
       if (desc) {
         const lines = desc.includes("\n") ? desc.split("\n") : UI.wrap(desc, TITLE_WIDTH);
-        lines.forEach((l, i) => {
-          const indent = desc.includes("\n")
-            ? " ".repeat(Math.max(0, Math.floor((UI.cols() - l.length) / 2)))
-            : " ".repeat(Math.max(0, Math.floor((UI.cols() - TITLE_WIDTH) / 2)));
-          contentLines.push(i === 0 ? `${indent}\x1B[2m${l}\x1B[22m` : `${indent}${l}`);
+        lines.forEach((l) => {
+          const indent = " ".repeat(Math.max(0, Math.floor((UI.cols() - TITLE_WIDTH) / 2)));
+          contentLines.push(`${indent}\x1B[2m${l}\x1B[22m`);
         });
       }
       if (title || desc) contentLines.push("");
@@ -98,25 +124,43 @@ export default class UI {
       const topPadding = Math.max(0, Math.floor((termHeight - 1 - contentLines.length) / 2));
 
       process.stdout.write("\x1B[2J\x1B[H");
-      process.stdout.write(backLine + "\n");
+      process.stdout.write(backLine);
+      if (action) {
+        const actionText = `${action.label} (Ctrl+O)`;
+        process.stdout.write(`\x1B[${c - actionText.length + 1}G\x1B[2m${actionText}\x1B[22m`);
+      }
+      process.stdout.write("\n");
       process.stdout.write("\n".repeat(topPadding));
       process.stdout.write(contentLines.join("\n"));
+      process.stdout.write("\n\n");
     };
 
     renderFrame();
 
+    let lastAction = 0;
+    const onData = (key: string) => {
+      if (key === "\u000f" && action) {
+        if (Date.now() - lastAction < 5000) return;
+        lastAction = Date.now();
+        action.run();
+        renderFrame();
+        return;
+      }
+      handleKey(key);
+    };
+
     process.stdout.on("resize", renderFrame);
-    stdin.on("data", handleKey);
+    stdin.on("data", onData);
 
     const cleanup = () => {
       process.stdout.removeListener("resize", renderFrame);
-      stdin.removeListener("data", handleKey);
+      stdin.removeListener("data", onData);
     };
 
     return { cleanup, rerender: renderFrame };
   }
 
-  static menu(items: string[], title?: string, desc?: string, backText?: string): Promise<{ value: string | null; cancelled: boolean }> {
+  static menu(items: string[], layoutOptions?: MenuOptions): Promise<UIReturn> {
     return new Promise((resolve) => {
       let selectedIndex = 0;
       let keyHandler: (key: string) => void = () => { };
@@ -148,12 +192,27 @@ export default class UI {
         return [emptyLine, ...itemLines, emptyLine].join("\n");
       };
 
-      const { cleanup, rerender } = UI.render(draw, (key) => keyHandler(key), title, desc, backText);
+      const { cleanup: origCleanup, rerender } = UI.render(draw, (key) => keyHandler(key), layoutOptions);
+      let cleanup = origCleanup;
+
+      if (layoutOptions?.refresh) {
+        const refreshInterval = async () => {
+          const newItems = await layoutOptions.refresh!();
+          if (JSON.stringify(newItems) !== JSON.stringify(items)) {
+            items.length = 0;
+            items.push(...newItems);
+            if (selectedIndex >= items.length) selectedIndex = Math.max(0, items.length - 1);
+            rerender();
+          }
+        };
+        const id = setInterval(refreshInterval, 3000);
+        cleanup = () => { clearInterval(id); origCleanup(); };
+      }
 
       keyHandler = (key) => {
         if (key === "\u001b") {
           cleanup();
-          resolve({ value: null, cancelled: true });
+          resolve({ value: "", cancelled: true });
           return;
         }
         if (key === "\r" || key === "\r\n") {
@@ -175,7 +234,8 @@ export default class UI {
     });
   }
 
-  static input(title?: string, desc?: string, defaultValue?: string, backText?: string, maxLen?: number): Promise<{ value: string; cancelled: boolean }> {
+  static input(layoutOptions?: InputOptions): Promise<UIReturn> {
+    const { defaultValue, maxLen, filter } = layoutOptions ?? {};
     return new Promise((resolve) => {
       let value = defaultValue ?? "";
       let cursorPos = value.length;
@@ -235,7 +295,7 @@ export default class UI {
         return parts.join("\n");
       };
 
-      const { cleanup, rerender } = UI.render(draw, (key) => keyHandler(key), title, desc, backText);
+      const { cleanup, rerender } = UI.render(draw, (key) => keyHandler(key), layoutOptions);
 
       keyHandler = (key) => {
         if (key === "\u001b") {
@@ -278,7 +338,7 @@ export default class UI {
         if (key.length > 1 && key.charCodeAt(0) !== 27) {
           const sanitized = [...key].filter((c) => {
             const code = c.charCodeAt(0);
-            return code >= 33 && code <= 126;
+            return code >= 33 && code <= 126 && (!filter || filter.test(c));
           }).join("");
           if (sanitized.length === 0) return;
           const available = MAX_LEN - value.length;
@@ -290,7 +350,7 @@ export default class UI {
           }
           return;
         }
-        if (key.length === 1 && key.charCodeAt(0) >= 33 && value.length < MAX_LEN) {
+        if (key.length === 1 && key.charCodeAt(0) >= 33 && value.length < MAX_LEN && (!filter || filter.test(key))) {
           value = value.slice(0, cursorPos) + key + value.slice(cursorPos);
           cursorPos++;
           rerender();

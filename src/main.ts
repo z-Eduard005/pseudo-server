@@ -1,4 +1,4 @@
-import { log, tryCatch, throwErr } from "./utils";
+import { log, tryCatch, throwErr, color } from "./utils";
 import UI from "./managers/ui";
 import Zerotier from "./managers/zerotier";
 import Git from "./managers/git";
@@ -18,26 +18,40 @@ tryCatch(
         "Create Server Instance",
         "Choose Server",
         "Add New Server",
-      ], UI.START_ART, "Choose an option:", "Exit");
+      ], { title: UI.START_ART, desc: "Choose an option:", backText: "Exit" });
 
       if (cancelled) await Process.stop();
 
       if (option === "Create Server Instance") {
         let serverName = "";
-        let somethingElse = "";
+        let serverVersion = "";
         let step = 1;
 
         while (step > 0 && step < 3) {
           if (step === 1) {
-            const { value, cancelled } = await UI.input("[1|2]: Server creation...", "Type a name for your server:", serverName);
+            const { value, cancelled } = await UI.input({
+              title: `${color("[1|3]:", "info")} Server creation...`,
+              filter: /[a-zA-Z_-]/,
+              desc: "Type a name for your server instance:",
+              defaultValue: serverName
+            });
+
             if (cancelled) { step = 0; break; }
             serverName = value;
             step = 2;
           }
           if (step === 2) {
-            const { value, cancelled } = await UI.input("[2|2]: Server creation...", "Type something else:", somethingElse);
-            if (cancelled) { somethingElse = value; step = 1; continue; }
-            somethingElse = value;
+            const versions = await Tlauncher.installedVersions();
+            const { value, cancelled } = await UI.menu(versions, {
+              title: `${color("[2|3]:", "info")} Server creation...`,
+              desc: "Choose Minecraft version (install from tlauncher):",
+              refresh: Tlauncher.installedVersions,
+              action: { label: "Open TLauncher", run: () => Tlauncher.launch() }
+            });
+
+            if (cancelled) { step = 1; continue; }
+            serverVersion = value;
+            console.log(serverVersion);
             step = 3;
           }
         }

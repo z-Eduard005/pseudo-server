@@ -13,15 +13,14 @@ export default class Process {
   private static async ensureAdmin() {
     const isAdmin = await isSuccess(async () => await run("net session"));
     if (isAdmin) return;
-
     throwErr(`You don't have admin rights!\nPlease start the program as an admin`);
   }
 
-  private static async isFedora() {
+  private static async isNotFedora() {
     return await tryCatch(
       async () => {
         const osRelease = await run("cat /etc/os-release");
-        return osRelease.toLowerCase().includes("id=fedora");
+        return !osRelease.toLowerCase().includes("id=fedora");
       }, "Error checking OS type"
     );
   }
@@ -31,19 +30,19 @@ export default class Process {
 
     if (IS_WIN32) {
       await Process.ensureAdmin();
-    } else if (await Process.isFedora()) {
-      await run("sudo -v", { inherit: true });
-    } else {
-      throwErr("Apologies, this program currently only works on Windows or Fedora Linux.");
+    } else if (await Process.isNotFedora()) {
+      throwErr("Apologies, this program currently only works on Windows or Fedora Linux");
     }
 
     process.on("uncaughtException", err => {
       UI.restoreMainScreen();
-      throwErr("Uncaught Exception: " + err);
+      log("Uncaught Exception: " + err, "error");
+      Process.stop();
     });
     process.on("unhandledRejection", reason => {
       UI.restoreMainScreen();
-      throwErr("Unhandled Rejection: " + reason);
+      log("Unhandled Rejection: " + reason, "error");
+      Process.stop();
     });
 
     const { emitWarning } = process;
@@ -61,7 +60,7 @@ export default class Process {
           output: process.stdout,
         });
 
-        rl.question(color("Press button to continue...", "warning"), () => {
+        rl.question(color("Press Enter to continue...", "warning"), () => {
           rl.close();
           resolve();
         });
@@ -90,7 +89,6 @@ export default class Process {
     if (successLog) log(successLog, "success");
 
     await Process.pause();
-    try { process.stdin.setRawMode(false); } catch { }
     process.exit(0);
   }
 }

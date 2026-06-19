@@ -1,13 +1,13 @@
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, readdir } from "fs/promises";
 import { exists, run, log, throwErr, tryCatch } from "../utils"
 import { join } from "path";
 import { IS_WIN32, MC_DIR } from "../constants";
-import { exec, spawn } from "child_process";
 import JDK from "./jdk";
 
 const CUSTOM_VERSION = "TEST";
 
 export default class Tlauncher {
+  private static readonly VERSIONS_DIR = join(MC_DIR, "game", "versions");
   private static readonly PROPS_FILE = join(MC_DIR, "tl.properties");
   private static readonly PROPS_VERSION_ENTRY = "pseudo-server=V1";
   private static readonly FILENAME = IS_WIN32 ? "LL.exe" : "LL.sh";
@@ -99,22 +99,17 @@ export default class Tlauncher {
     }, err);
   }
 
-  static launch() {
-    tryCatch(
-      () => {
-        return exec(
+  static async launch() {
+    await tryCatch(
+      async () => {
+        await run(
           IS_WIN32
             ? `taskkill /f /im "${Tlauncher.FILENAME}" 2>nul`
-            : `ps aux | grep tlauncher | grep ${Tlauncher.FILENAME.split(".")[0]}.exe | awk '{print $2}' | xargs -r kill`,
-          () => {
-            return spawn(Tlauncher.FILE, {
-              detached: true,
-              shell: true,
-            }).unref();
-          }
-        ).unref();
+            : `ps aux | grep '[t]launcher' | grep ${Tlauncher.FILENAME.split(".")[0]}.exe | awk '{print $2}' | xargs -r kill`,
+        );
+        run(Tlauncher.FILE);
       },
-      `Tlauncher not launched automatically! (check path: ${Tlauncher.FILE})`,
+      `Tlauncher not launched automatically (check path: ${Tlauncher.FILE})`,
       true
     );
   }
@@ -123,8 +118,7 @@ export default class Tlauncher {
     if (await exists(MC_DIR)) return;
 
     log(
-      `This server works only with legacy-launcher${IS_WIN32 ? "\nInstall tlauncher first (from opening link) and try later..." : " and steam-proton setup\nInstalling using 'github.com/z-Eduard005/fedora-mc-installer' script..."}`,
-      "warning"
+      `This server works only with legacy-launcher${IS_WIN32 ? "\nInstall tlauncher first (from opening link) and try later..." : " and steam-proton setup\nInstalling using 'github.com/z-Eduard005/fedora-mc-installer' script..."}`, "warning"
     );
     await tryCatch(
       () => {
@@ -137,5 +131,12 @@ export default class Tlauncher {
 
     log("Please restart now, after tlauncher installed", "success");
     throwErr();
+  }
+
+  static async installedVersions(): Promise<string[]> {
+    return await tryCatch(async () => {
+      const entries = await readdir(Tlauncher.VERSIONS_DIR, { withFileTypes: true });
+      return entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+    }, "Failed to read installed versions");
   }
 }
