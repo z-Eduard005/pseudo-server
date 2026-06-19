@@ -166,6 +166,8 @@ export default class UI {
         : 0;
       if (selectedIndex < 0 || selectedIndex >= items.length) selectedIndex = 0;
       let scrollOffset = 0;
+      let filter = "";
+      const CURSOR_BG = "\x1B[48;5;27m";
       const MAX_VISIBLE = 10;
       let keyHandler: (key: string) => void = () => { };
 
@@ -178,20 +180,34 @@ export default class UI {
         const listIndent = " ".repeat(Math.max(0, listLeft));
         const emptyLine = `${listIndent}${UI.BG}${UI.FG}${" ".repeat(LIST_WIDTH)}${UI.RST}`;
 
-        const scrollNeeded = items.length > MAX_VISIBLE;
+        const pool = filter ? items.filter(i => i.toLowerCase().includes(filter.toLowerCase())) : items;
+        if (selectedIndex >= pool.length) selectedIndex = Math.max(0, pool.length - 1);
+
+        const scrollNeeded = pool.length > MAX_VISIBLE;
+        const searchVisible = items.length > MAX_VISIBLE;
+
+        const searchPrefix = "> ";
+        const maxSearchWidth = LIST_WIDTH - 2 * UI.PADDING - searchPrefix.length - 1;
+        const displayFilter = filter.length > maxSearchWidth
+          ? ".." + filter.slice(-(maxSearchWidth - 2))
+          : filter;
+        const searchRightFill = Math.max(0, LIST_WIDTH - UI.PADDING - searchPrefix.length - displayFilter.length - 1);
+        const searchLine = searchVisible
+          ? `${listIndent}${UI.BG}${UI.FG}${" ".repeat(UI.PADDING)}\x1B[2m${searchPrefix}\x1B[22m${displayFilter}${CURSOR_BG} ${UI.BG}${UI.FG}${" ".repeat(searchRightFill)}${UI.RST}`
+          : "";
 
         if (scrollNeeded) {
           if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
           if (selectedIndex >= scrollOffset + MAX_VISIBLE) scrollOffset = selectedIndex - MAX_VISIBLE + 1;
         }
 
-        const visibleItems = scrollNeeded ? items.slice(scrollOffset, scrollOffset + MAX_VISIBLE) : items;
+        const visibleItems = scrollNeeded ? pool.slice(scrollOffset, scrollOffset + MAX_VISIBLE) : pool;
 
         const scrollbarChars: string[] = [];
         if (scrollNeeded) {
           const trackHeight = MAX_VISIBLE;
-          const thumbSize = Math.max(1, Math.round((trackHeight / items.length) * trackHeight));
-          const maxScroll = items.length - trackHeight;
+          const thumbSize = Math.max(1, Math.round((trackHeight / pool.length) * trackHeight));
+          const maxScroll = pool.length - trackHeight;
           const ts = maxScroll > 0
             ? Math.round((scrollOffset / maxScroll) * (trackHeight - thumbSize))
             : 0;
@@ -228,7 +244,7 @@ export default class UI {
 
         const hint = "\u2191 \u2193 to move";
         const hintIndent = " ".repeat(Math.max(0, Math.floor((UI.cols() - hint.length) / 2)));
-        return [emptyLine, ...itemLines, emptyLine, `${hintIndent}\x1B[2m${hint}\x1B[22m`].join("\n");
+        return [(searchVisible ? searchLine : emptyLine), ...itemLines, emptyLine, `${hintIndent}\x1B[2m${hint}\x1B[22m`].join("\n");
       };
 
       const { cleanup: origCleanup, rerender } = UI.render(draw, (key) => keyHandler(key), layoutOptions);
@@ -240,7 +256,6 @@ export default class UI {
           if (JSON.stringify(newItems) !== JSON.stringify(items)) {
             items.length = 0;
             items.push(...newItems);
-            if (selectedIndex >= items.length) selectedIndex = Math.max(0, items.length - 1);
             rerender();
           }
         };
@@ -249,25 +264,46 @@ export default class UI {
       }
 
       keyHandler = (key) => {
+        const pool = filter ? items.filter(i => i.toLowerCase().includes(filter.toLowerCase())) : items;
+
         if (key === "\u001b") {
           cleanup();
           resolve({ value: "", index: selectedIndex, cancelled: true });
           return;
         }
         if (key === "\r" || key === "\r\n") {
+          if (pool.length === 0) return;
           cleanup();
-          resolve({ value: items[selectedIndex]!, index: selectedIndex, cancelled: false });
+          resolve({ value: pool[selectedIndex]!, index: selectedIndex, cancelled: false });
           return;
         }
         if (key === "\u001b[A") {
-          selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : items.length - 1;
+          selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : pool.length - 1;
           rerender();
           return;
         }
         if (key === "\u001b[B") {
-          selectedIndex = selectedIndex < items.length - 1 ? selectedIndex + 1 : 0;
+          selectedIndex = selectedIndex < pool.length - 1 ? selectedIndex + 1 : 0;
           rerender();
           return;
+        }
+        if (items.length > MAX_VISIBLE) {
+          if (key.length === 1 && /[a-zA-Z]/.test(key)) {
+            filter += key;
+            selectedIndex = 0;
+            scrollOffset = 0;
+            rerender();
+            return;
+          }
+          if (key === "\x7f" || key === "\b") {
+            if (filter.length > 0) {
+              filter = filter.slice(0, -1);
+              selectedIndex = 0;
+              scrollOffset = 0;
+              rerender();
+            }
+            return;
+          }
         }
       };
     });
