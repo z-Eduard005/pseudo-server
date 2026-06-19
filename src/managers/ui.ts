@@ -11,11 +11,10 @@ type InputOptions = LayoutOptions & {
   filter?: RegExp;
 }
 
-type MenuOptions = LayoutOptions & {
+type ListOptions = LayoutOptions & {
   refresh?: () => Promise<string[]>;
+  defaultValue?: number;
 }
-
-type UIReturn = { value: string; cancelled: boolean };
 
 type Render = (
   draw: () => string,
@@ -160,9 +159,14 @@ export default class UI {
     return { cleanup, rerender: renderFrame };
   }
 
-  static menu(items: string[], layoutOptions?: MenuOptions): Promise<UIReturn> {
+  static list(items: string[], layoutOptions?: ListOptions): Promise<{ value: string; index: number; cancelled: boolean }> {
     return new Promise((resolve) => {
-      let selectedIndex = 0;
+      let selectedIndex = layoutOptions?.defaultValue !== undefined
+        ? Math.min(Math.max(0, layoutOptions.defaultValue), Math.max(0, items.length - 1))
+        : 0;
+      if (selectedIndex < 0 || selectedIndex >= items.length) selectedIndex = 0;
+      let scrollOffset = 0;
+      const MAX_VISIBLE = 10;
       let keyHandler: (key: string) => void = () => { };
 
       const draw = () => {
@@ -174,22 +178,57 @@ export default class UI {
         const listIndent = " ".repeat(Math.max(0, listLeft));
         const emptyLine = `${listIndent}${UI.BG}${UI.FG}${" ".repeat(LIST_WIDTH)}${UI.RST}`;
 
-        const itemLines = items.flatMap((item, index) => {
-          const wrapped = item.length > TEXT_AREA ? UI.wrap(item, TEXT_AREA) : [item];
+        const scrollNeeded = items.length > MAX_VISIBLE;
+
+        if (scrollNeeded) {
+          if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
+          if (selectedIndex >= scrollOffset + MAX_VISIBLE) scrollOffset = selectedIndex - MAX_VISIBLE + 1;
+        }
+
+        const visibleItems = scrollNeeded ? items.slice(scrollOffset, scrollOffset + MAX_VISIBLE) : items;
+
+        const scrollbarChars: string[] = [];
+        if (scrollNeeded) {
+          const trackHeight = MAX_VISIBLE;
+          const thumbSize = Math.max(1, Math.round((trackHeight / items.length) * trackHeight));
+          const maxScroll = items.length - trackHeight;
+          const ts = maxScroll > 0
+            ? Math.round((scrollOffset / maxScroll) * (trackHeight - thumbSize))
+            : 0;
+          const te = Math.min(ts + thumbSize, trackHeight);
+          for (let i = 0; i < trackHeight; i++) {
+            scrollbarChars.push(i >= ts && i < te ? "\u2588" : "\u2502");
+          }
+        }
+
+        const scrollBarWidth = scrollNeeded ? 2 : 0;
+
+        const itemLines = visibleItems.flatMap((item, index) => {
+          const actualIndex = scrollNeeded ? scrollOffset + index : index;
+          const textWidth = TEXT_AREA - scrollBarWidth;
+          const wrapped = item.length > textWidth ? UI.wrap(item, textWidth) : [item];
           return wrapped.map((l, i) => {
             const plain = l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-            const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length);
+            const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth);
 
-            if (index === selectedIndex && i === 0) {
-              return `${listIndent}${SEL_BG}${SEL_FG}${" ".repeat(UI.PADDING)}\x1B[1m${l}\x1B[22m${" ".repeat(rightFill)}${UI.RST}`;
-            }
+            const isSelected = actualIndex === selectedIndex && i === 0;
+            const bg = isSelected ? SEL_BG : UI.BG;
+            const fg = isSelected ? SEL_FG : UI.FG;
             const style = i === 0 ? "\x1B[1m" : "";
             const resetStyle = i === 0 ? "\x1B[22m" : "";
-            return `${listIndent}${UI.BG}${UI.FG}${" ".repeat(UI.PADDING)}${style}${l}${resetStyle}${" ".repeat(rightFill)}${UI.RST}`;
+
+            let line = `${listIndent}${bg}${fg}${" ".repeat(UI.PADDING)}${style}${l}${resetStyle}${" ".repeat(rightFill)}`;
+            if (scrollNeeded) {
+              line += `${scrollbarChars[index] ?? "\u2502"} `;
+            }
+            line += UI.RST;
+            return line;
           });
         });
 
-        return [emptyLine, ...itemLines, emptyLine].join("\n");
+        const hint = "\u2191 \u2193 to move";
+        const hintIndent = " ".repeat(Math.max(0, Math.floor((UI.cols() - hint.length) / 2)));
+        return [emptyLine, ...itemLines, emptyLine, `${hintIndent}\x1B[2m${hint}\x1B[22m`].join("\n");
       };
 
       const { cleanup: origCleanup, rerender } = UI.render(draw, (key) => keyHandler(key), layoutOptions);
@@ -212,12 +251,12 @@ export default class UI {
       keyHandler = (key) => {
         if (key === "\u001b") {
           cleanup();
-          resolve({ value: "", cancelled: true });
+          resolve({ value: "", index: selectedIndex, cancelled: true });
           return;
         }
         if (key === "\r" || key === "\r\n") {
           cleanup();
-          resolve({ value: items[selectedIndex]!, cancelled: false });
+          resolve({ value: items[selectedIndex]!, index: selectedIndex, cancelled: false });
           return;
         }
         if (key === "\u001b[A") {
@@ -234,7 +273,7 @@ export default class UI {
     });
   }
 
-  static input(layoutOptions?: InputOptions): Promise<UIReturn> {
+  static input(layoutOptions?: InputOptions): Promise<{ value: string; cancelled: boolean }> {
     const { defaultValue, maxLen, filter } = layoutOptions ?? {};
     return new Promise((resolve) => {
       let value = defaultValue ?? "";

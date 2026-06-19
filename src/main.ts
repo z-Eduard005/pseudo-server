@@ -13,18 +13,21 @@ tryCatch(
     await Process.init();
     await App.setup();
 
+    let mainOptionIndex = 0;
     while (true) {
-      const { value: option, cancelled } = await UI.menu([
+      const { value, cancelled, index } = await UI.list([
         "Create Server Instance",
         "Choose Server",
         "Add New Server",
-      ], { title: UI.START_ART, desc: "Choose an option:", backText: "Exit" });
+      ], { title: UI.START_ART, desc: "Choose an option:", backText: "Exit", defaultValue: mainOptionIndex });
+      mainOptionIndex = index;
 
       if (cancelled) await Process.stop();
 
-      if (option === "Create Server Instance") {
+      if (value === "Create Server Instance") {
         let serverName = "";
         let serverVersion = "";
+        let serverVersionIndex = -1;
         let step = 1;
 
         while (step > 0 && step < 3) {
@@ -42,15 +45,17 @@ tryCatch(
           }
           if (step === 2) {
             const versions = await Tlauncher.installedVersions();
-            const { value, cancelled } = await UI.menu(versions, {
+            const { value, cancelled, index } = await UI.list(versions, {
               title: `${color("[2|3]:", "info")} Server creation...`,
               desc: "Choose Minecraft version (install from tlauncher):",
               refresh: Tlauncher.installedVersions,
-              action: { label: "Open TLauncher", run: () => Tlauncher.launch() }
+              action: { label: "Open TLauncher", run: () => Tlauncher.launch() },
+              defaultValue: serverVersionIndex
             });
 
-            if (cancelled) { step = 1; continue; }
+            if (cancelled) { serverVersionIndex = index; step = 1; continue; }
             serverVersion = value;
+            serverVersionIndex = index;
             console.log(serverVersion);
             step = 3;
           }
@@ -60,8 +65,8 @@ tryCatch(
         break;
       }
 
-      if (option === "Choose Server") continue;
-      if (option === "Add New Server") continue;
+      if (value === "Choose Server") continue;
+      if (value === "Add New Server") continue;
     }
     UI.restoreMainScreen();
 
