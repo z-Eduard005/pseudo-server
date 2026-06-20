@@ -45,6 +45,7 @@ tryCatch(
 
             if (cancelled) { step = 0; break; }
             serverName = value;
+
             step = 2;
           }
           if (step === 2) {
@@ -60,9 +61,8 @@ tryCatch(
             if (cancelled) { serverVersionIndex = index; step = 1; continue; }
             serverVersion = value;
             serverVersionIndex = index;
-            const loader = UI.loader("Setting up server version...");
-            await Tlauncher.setupServerVersion(serverVersion, serverName);
-            loader.stop();
+            await App.initInstance(serverName, serverVersion);
+
             step = 3;
           }
         }

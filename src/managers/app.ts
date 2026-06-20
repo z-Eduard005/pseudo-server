@@ -23,6 +23,7 @@ type GithubRelease = {
 
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
+  static readonly INSTANCES_DIR = join(App.DIR, "instances");
   static readonly NAME = "Pseudo-Server";
   private static readonly VERSION = "0.0.15";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
@@ -40,13 +41,11 @@ export default class App {
     return r0 > c0 || (r0 === c0 && r1 > c1) || (r0 === c0 && r1 === c1 && r2 > c2);
   }
 
-  static async getConfig(file: string): Promise<Record<string, unknown> | undefined> {
-    if (!(await exists(file))) return;
+  static async getConfig(file: string): Promise<Record<string, unknown>> {
+    if (!(await exists(file))) return {};
 
     return await tryCatch(
-      async () => {
-        return JSON.parse(await readFile(file, "utf8"));
-      },
+      async () => JSON.parse(await readFile(file, "utf8")),
       `Failed to read config file: ${file}`
     );
   }
@@ -54,9 +53,7 @@ export default class App {
   static async putConfig(file: string, data: Record<string, unknown>) {
     const existing = await App.getConfig(file);
     await tryCatch(
-      () => {
-        return writeFile(file, JSON.stringify({ ...(existing ?? {}), ...data }));
-      },
+      () => writeFile(file, JSON.stringify({ ...(existing ?? {}), ...data })),
       `Failed to write config file: ${file}`
     );
   }
@@ -168,5 +165,12 @@ export default class App {
     }
 
     await App.checkUpdates();
+  }
+
+  static async initInstance(serverName: string, serverVersion: string) {
+    const instanceDir = join(App.INSTANCES_DIR, serverName);
+    await mkdir(instanceDir, { recursive: true });
+    await Tlauncher.setupServerVersion(serverVersion, serverName);
+    await App.putConfig(join(instanceDir, "config.json"), { name: serverName });
   }
 }

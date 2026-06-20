@@ -1,8 +1,9 @@
-import { readFile, writeFile, readdir, cp, rename } from "fs/promises";
+import { readFile, writeFile, readdir, cp, rename, rm } from "fs/promises";
 import { exists, run, log, throwErr, tryCatch } from "../utils"
 import { join, extname } from "path";
 import { IS_WIN32, MC_DIR } from "../constants";
 import JDK from "./jdk";
+import UI from "./ui";
 
 const CUSTOM_VERSION = "TEST";
 
@@ -141,10 +142,12 @@ export default class Tlauncher {
   }
 
   static async setupServerVersion(sourceVersion: string, serverName: string) {
+    const loader = UI.loader("Setting up server version...");
     await tryCatch(async () => {
       const srcDir = join(Tlauncher.VERSIONS_DIR, sourceVersion);
       const dstDir = join(Tlauncher.VERSIONS_DIR, serverName);
 
+      await rm(dstDir, { recursive: true, force: true });
       await cp(srcDir, dstDir, { recursive: true });
 
       const files = await readdir(dstDir);
@@ -167,5 +170,6 @@ export default class Tlauncher {
       }
       await writeFile(jsonFile, JSON.stringify(json), "utf8");
     }, `Failed to setup server version for "${serverName}"`);
+    loader.stop();
   }
 }
