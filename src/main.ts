@@ -13,6 +13,11 @@ tryCatch(
     await Process.init();
     await App.setup();
 
+    // Test: show loader for 10 seconds
+    const loader = UI.loader("Setting up environment...");
+    await new Promise(r => setTimeout(r, 10000));
+    loader.stop();
+
     let mainOptionIndex = 0;
     while (true) {
       const { value, cancelled, index } = await UI.list([

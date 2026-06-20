@@ -1,7 +1,7 @@
 type LayoutOptions = {
   title?: string;
   desc?: string;
-  backText?: string;
+  backText?: string | null;
   action?: { label: string; run: () => void };
 }
 
@@ -60,12 +60,52 @@ export default class UI {
       process.stderr.write(`\r\x1B[2K${UI.LOADER_FRAMES[i++ % 10]}`);
     }, 80);
 
-    try {
-      return await fn();
-    } finally {
-      clearInterval(id);
-      process.stderr.write(`\r\x1B[2K`);
-    }
+    const result = await fn();
+    clearInterval(id);
+    process.stderr.write(`\r\x1B[2K`);
+    return result;
+  }
+
+  static loader(text?: string): { stop: () => void } {
+    let frame = 0;
+    const W = 30;
+    const bounce: string[] = [];
+    for (let i = 0; i < W; i++) bounce.push(" ".repeat(i) + "●" + " ".repeat(W - i - 1));
+    for (let i = W - 2; i > 0; i--) bounce.push(" ".repeat(i) + "●" + " ".repeat(W - i - 1));
+
+    const totalW = W + 2;
+
+    const draw = () => {
+      const indent = " ".repeat(Math.max(0, Math.floor((UI.cols() - totalW) / 2)));
+      const ball = bounce[frame % bounce.length];
+      const box = [
+        "╔" + "═".repeat(W) + "╗",
+        "║" + " ".repeat(W) + "║",
+        "║" + ball + "║",
+        "║" + " ".repeat(W) + "║",
+        "╚" + "═".repeat(W) + "╝",
+      ].map(l => indent + l).join("\n");
+      if (text) {
+        const tIndent = " ".repeat(Math.max(0, Math.floor((UI.cols() - text.length) / 2)));
+        return `\x1B[1m${tIndent}${text}\x1B[22m\n\n${box}`;
+      }
+      return box;
+    };
+
+    const { cleanup, rerender } = UI.render(draw, () => {}, { backText: null });
+
+    const id = setInterval(() => {
+      frame++;
+      rerender();
+    }, 80);
+
+    return {
+      stop: () => {
+        clearInterval(id);
+        cleanup();
+        UI.restoreMainScreen();
+      }
+    };
   }
 
   static createAltScreen() {
@@ -135,15 +175,18 @@ export default class UI {
       }
 
       const termHeight = process.stdout.rows || 24;
-      const topPadding = Math.max(0, Math.floor((termHeight - 1 - contentLines.length) / 2));
+      const hasBack = backText !== null;
+      const topPadding = Math.max(0, Math.floor((termHeight - (hasBack ? 1 : 0) - contentLines.length) / 2));
 
       let frame = "\x1B[?2026h\x1B[2J\x1B[H";
-      frame += backLine;
-      if (action) {
-        const actionText = `${action.label} (Ctrl+O)`;
-        frame += `\x1B[${c - actionText.length + 1}G\x1B[2m${actionText}\x1B[22m`;
+      if (hasBack) {
+        frame += backLine;
+        if (action) {
+          const actionText = `${action.label} (Ctrl+O)`;
+          frame += `\x1B[${c - actionText.length + 1}G\x1B[2m${actionText}\x1B[22m`;
+        }
+        frame += "\n";
       }
-      frame += "\n";
       frame += "\n".repeat(topPadding);
       frame += contentLines.join("\n");
       frame += "\n\n\x1B[?2026l";
