@@ -11,6 +11,7 @@ import Zerotier from "./zerotier";
 import Tlauncher from "./tlauncher";
 import Process from "./process";
 import GH from "./gh";
+import UI from "./ui";
 
 type GithubRelease = {
   tag_name: string;
@@ -122,7 +123,7 @@ export default class App {
 
   private static async checkUpdates() {
     await tryCatch(async () => {
-      const res = await fetch(App.RELEASE_URL);
+      const res = await UI.withLoader(async () => await fetch(App.RELEASE_URL));
       if (!res.ok) {
         log(`Update check failed:\n\nstatus: ${res.status}\nstatusText: ${res.statusText}\nbody: ${res.body}`, "warning");
         return;
@@ -136,7 +137,7 @@ export default class App {
       if (!asset) throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
 
       log(`Downloading ${release.tag_name}...`, "info");
-      const dl = await fetch(asset!.browser_download_url);
+      const dl = await UI.withLoader(async () => await fetch(asset!.browser_download_url));
       const buffer = Buffer.from(await dl.arrayBuffer());
 
       await writeFile(`${App.FILE}.tmp`, buffer);
