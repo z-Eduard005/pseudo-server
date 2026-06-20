@@ -34,6 +34,7 @@ export default class App {
   private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
   private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
   private static readonly DESKTOP_ENTRY_FILE = join(App.DESKTOP_ENTRY_PATH, App.NAME + ".desktop");
+  private static readonly PENDING_DIR = join(App.INSTANCES_DIR, "PENDING_DIR");
 
   private static isNewerVersion(releaseTag: string): boolean {
     const [r0 = 0, r1 = 0, r2 = 0] = releaseTag.replace(/^v/, "").split(".").map(Number);
@@ -53,7 +54,7 @@ export default class App {
   static async putConfig(file: string, data: Record<string, unknown>) {
     const existing = await App.getConfig(file);
     await tryCatch(
-      () => writeFile(file, JSON.stringify({ ...(existing ?? {}), ...data })),
+      () => writeFile(file, JSON.stringify({ ...existing, ...data })),
       `Failed to write config file: ${file}`
     );
   }
@@ -159,7 +160,7 @@ export default class App {
     await GH.ensureAuth();
 
     const config = await App.getConfig(App.CONFIG_FILE);
-    if (config?.["installed"] !== true) {
+    if (config["installed"] !== true) {
       log("Pseudo-Server successfully installed :)", "success");
       await App.putConfig(App.CONFIG_FILE, { installed: true });
     }
@@ -168,9 +169,13 @@ export default class App {
   }
 
   static async initInstance(serverName: string, serverVersion: string) {
-    const instanceDir = join(App.INSTANCES_DIR, serverName);
-    await mkdir(instanceDir, { recursive: true });
+    await rm(App.PENDING_DIR, { recursive: true, force: true });
+    await mkdir(App.PENDING_DIR, { recursive: true });
     await Tlauncher.setupServerVersion(serverVersion, serverName);
-    await App.putConfig(join(instanceDir, "config.json"), { name: serverName });
+    await rename(App.PENDING_DIR, join(App.INSTANCES_DIR, serverName));
+
+    const config = await App.getConfig(App.CONFIG_FILE);
+    const instances = (config["instances"] as string[]) ?? [];
+    await App.putConfig(App.CONFIG_FILE, { instances: [...instances, serverName] });
   }
 }
