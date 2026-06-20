@@ -69,19 +69,30 @@ export default class UI {
   static loader(text?: string): { stop: () => void } {
     let frame = 0;
     const W = 30;
-    const bounce: string[] = [];
-    for (let i = 0; i < W; i++) bounce.push(" ".repeat(i) + "●" + " ".repeat(W - i - 1));
-    for (let i = W - 2; i > 0; i--) bounce.push(" ".repeat(i) + "●" + " ".repeat(W - i - 1));
+    const BLUE = "\x1B[38;5;27m";
+    const RST_FG = "\x1B[39m";
+    const bounce: string[][] = [];
+    for (let i = 0; i <= W - 2; i++) {
+      const l = " ".repeat(i);
+      const r = " ".repeat(W - i - 2);
+      bounce.push([l + `${BLUE}██${RST_FG}` + r, l + `${BLUE}██${RST_FG}` + r]);
+    }
+    for (let i = W - 3; i > 0; i--) {
+      const l = " ".repeat(i);
+      const r = " ".repeat(W - i - 2);
+      bounce.push([l + `${BLUE}██${RST_FG}` + r, l + `${BLUE}██${RST_FG}` + r]);
+    }
 
     const totalW = W + 2;
 
     const draw = () => {
       const indent = " ".repeat(Math.max(0, Math.floor((UI.cols() - totalW) / 2)));
-      const ball = bounce[frame % bounce.length];
+      const [r1, r2] = bounce[frame % bounce.length]!;
       const box = [
         "╔" + "═".repeat(W) + "╗",
         "║" + " ".repeat(W) + "║",
-        "║" + ball + "║",
+        "║" + r1 + "║",
+        "║" + r2 + "║",
         "║" + " ".repeat(W) + "║",
         "╚" + "═".repeat(W) + "╝",
       ].map(l => indent + l).join("\n");
@@ -97,7 +108,7 @@ export default class UI {
     const id = setInterval(() => {
       frame++;
       rerender();
-    }, 80);
+    }, 40);
 
     return {
       stop: () => {

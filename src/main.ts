@@ -13,9 +13,8 @@ tryCatch(
     await Process.init();
     await App.setup();
 
-    // Test: show loader for 10 seconds
-    const loader = UI.loader("Setting up environment...");
-    await new Promise(r => setTimeout(r, 10000));
+    const loader = UI.loader("TEST: Doing some stuff...");
+    await new Promise(r => setTimeout(r, 3000));
     loader.stop();
 
     let mainOptionIndex = 0;
