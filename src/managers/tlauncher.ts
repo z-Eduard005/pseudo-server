@@ -1,6 +1,6 @@
-import { readFile, writeFile, readdir } from "fs/promises";
+import { readFile, writeFile, readdir, cp, rename } from "fs/promises";
 import { exists, run, log, throwErr, tryCatch } from "../utils"
-import { join } from "path";
+import { join, extname } from "path";
 import { IS_WIN32, MC_DIR } from "../constants";
 import JDK from "./jdk";
 
@@ -138,5 +138,34 @@ export default class Tlauncher {
       const entries = await readdir(Tlauncher.VERSIONS_DIR, { withFileTypes: true });
       return entries.filter(e => e.isDirectory()).map(e => e.name).sort();
     }, "Failed to read installed versions");
+  }
+
+  static async setupServerVersion(sourceVersion: string, serverName: string) {
+    await tryCatch(async () => {
+      const srcDir = join(Tlauncher.VERSIONS_DIR, sourceVersion);
+      const dstDir = join(Tlauncher.VERSIONS_DIR, serverName);
+
+      await cp(srcDir, dstDir, { recursive: true });
+
+      const files = await readdir(dstDir);
+      for (const file of files) {
+        const ext = extname(file);
+        if (ext === ".jar" || ext === ".json" || ext === ".bak") {
+          const oldPath = join(dstDir, file);
+          const newName = ext === ".bak"
+            ? `${serverName}.jar.bak`
+            : `${serverName}${ext}`;
+          const newPath = join(dstDir, newName);
+          if (oldPath !== newPath) await rename(oldPath, newPath);
+        }
+      }
+
+      const jsonFile = join(dstDir, `${serverName}.json`);
+      const json = JSON.parse(await readFile(jsonFile, "utf8"));
+      for (const key of ["id", "jar", "family"]) {
+        if (json[key] !== undefined) json[key] = serverName;
+      }
+      await writeFile(jsonFile, JSON.stringify(json), "utf8");
+    }, `Failed to setup server version for "${serverName}"`);
   }
 }

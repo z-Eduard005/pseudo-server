@@ -40,24 +40,24 @@ export default class App {
     return r0 > c0 || (r0 === c0 && r1 > c1) || (r0 === c0 && r1 === c1 && r2 > c2);
   }
 
-  private static async getConfig(): Promise<Record<string, unknown> | undefined> {
-    if (!(await exists(App.CONFIG_FILE))) return;
+  static async getConfig(file: string): Promise<Record<string, unknown> | undefined> {
+    if (!(await exists(file))) return;
 
     return await tryCatch(
       async () => {
-        return JSON.parse(await readFile(App.CONFIG_FILE, "utf8"));
+        return JSON.parse(await readFile(file, "utf8"));
       },
-      "Failed to read config file"
+      `Failed to read config file: ${file}`
     );
   }
 
-  private static async putConfig(data: Record<string, unknown>) {
-    const existing = await App.getConfig();
+  static async putConfig(file: string, data: Record<string, unknown>) {
+    const existing = await App.getConfig(file);
     await tryCatch(
       () => {
-        return writeFile(App.CONFIG_FILE, JSON.stringify({ ...(existing ?? {}), ...data }));
+        return writeFile(file, JSON.stringify({ ...(existing ?? {}), ...data }));
       },
-      "Failed to write config file"
+      `Failed to write config file: ${file}`
     );
   }
 
@@ -161,10 +161,10 @@ export default class App {
     await GH.installGit();
     await GH.ensureAuth();
 
-    const config = await App.getConfig();
+    const config = await App.getConfig(App.CONFIG_FILE);
     if (config?.["installed"] !== true) {
       log("Pseudo-Server successfully installed :)", "success");
-      await App.putConfig({ installed: true });
+      await App.putConfig(App.CONFIG_FILE, { installed: true });
     }
 
     await App.checkUpdates();

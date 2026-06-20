@@ -60,7 +60,9 @@ tryCatch(
             if (cancelled) { serverVersionIndex = index; step = 1; continue; }
             serverVersion = value;
             serverVersionIndex = index;
-            console.log(serverVersion);
+            const loader = UI.loader("Setting up server version...");
+            await Tlauncher.setupServerVersion(serverVersion, serverName);
+            loader.stop();
             step = 3;
           }
         }
