@@ -5,6 +5,10 @@ import {
   DESKTOP_DIR,
   LINUX_SHELL,
   USER_DIR,
+  APP_NAME,
+  APP_DIR,
+  INSTANCES_DIR,
+  CONFIG_FILE,
 } from "../constants";
 import { run, retryRun, log, throwErr, tryCatch, exists } from "../utils";
 import Zerotier from "./zerotier";
@@ -28,19 +32,15 @@ export type Instance = {
 }
 
 export default class App {
-  static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
-  static readonly INSTANCES_DIR = join(App.DIR, "instances");
-  static readonly NAME = "Pseudo-Server";
-  static readonly CONFIG_FILE = join(App.DIR, "config.json");
-  private static readonly VERSION = "0.0.19";
+  private static readonly VERSION = "0.0.20";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
-  private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
-  private static readonly ICON_FILE = join(App.DIR, IS_WIN32 ? "icon.ico" : "icon.png");
-  private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
+  private static readonly FILE = join(APP_DIR, IS_WIN32 ? APP_NAME + ".exe" : APP_NAME);
+  private static readonly ICON_FILE = join(APP_DIR, IS_WIN32 ? "icon.ico" : "icon.png");
+  private static readonly SHORTCUT_FILE = join(APP_DIR, `${APP_NAME}.lnk`);
   private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
-  private static readonly DESKTOP_ENTRY_FILE = join(App.DESKTOP_ENTRY_PATH, App.NAME + ".desktop");
-  private static readonly PENDING_DIR = join(App.INSTANCES_DIR, "PENDING_DIR");
+  private static readonly DESKTOP_ENTRY_FILE = join(App.DESKTOP_ENTRY_PATH, APP_NAME + ".desktop");
+  private static readonly PENDING_DIR = join(INSTANCES_DIR, "PENDING_DIR");
 
   private static isNewerVersion(releaseTag: string): boolean {
     const [r0 = 0, r1 = 0, r2 = 0] = releaseTag.replace(/^v/, "").split(".").map(Number);
@@ -82,9 +82,9 @@ export default class App {
             $Shortcut = $WshShell.CreateShortcut('${App.SHORTCUT_FILE}')
             $Shortcut.TargetPath = 'powershell'
             $Shortcut.Arguments = '-Command "Start-Process -FilePath ''${App.FILE}'' -Verb RunAs -WindowStyle Normal"'
-            $Shortcut.WorkingDirectory = '${App.DIR}'
+            $Shortcut.WorkingDirectory = '${APP_DIR}'
             $Shortcut.IconLocation = '${App.ICON_FILE},0'
-            $Shortcut.Description = '${App.NAME}'
+            $Shortcut.Description = '${APP_NAME}'
             $Shortcut.Save()`.replace(/\n/g, "; ")}"`,
             { inherit: true }
           );
@@ -95,7 +95,7 @@ export default class App {
         await writeFile(
           App.DESKTOP_ENTRY_FILE,
           `[Desktop Entry]
-          Name=${App.NAME}
+          Name=${APP_NAME}
           Exec=${LINUX_SHELL} -lc "DRI_PRIME=1 ${App.FILE}"
           Terminal=true
           Type=Application
@@ -105,7 +105,7 @@ export default class App {
         );
         await run(`update-desktop-database ${App.DESKTOP_ENTRY_PATH}`, { inherit: true });
       }
-    }, `Failed to create a shortcut for ${App.NAME}`);
+    }, `Failed to create a shortcut for ${APP_NAME}`);
   }
 
   private static async moveBinnary() {
@@ -138,7 +138,7 @@ export default class App {
       const release = (await res.json()) as GithubRelease;
       if (!App.isNewerVersion(release.tag_name)) return;
 
-      const assetName = IS_WIN32 ? App.NAME + ".exe" : App.NAME;
+      const assetName = IS_WIN32 ? APP_NAME + ".exe" : APP_NAME;
       const asset = release.assets.find(a => a.name === assetName);
       if (!asset) throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
 
@@ -158,8 +158,8 @@ export default class App {
   }
 
   static async setup() {
-    await mkdir(App.DIR, { recursive: true });
-    log(`${App.NAME} v${App.VERSION}`, "info")
+    await mkdir(APP_DIR, { recursive: true });
+    log(`${APP_NAME} v${App.VERSION}`, "info")
     await App.createEntry();
     await App.moveBinnary();
 
@@ -168,17 +168,17 @@ export default class App {
     await GH.installGit();
     await Zerotier.install();
 
-    const config = await App.getConfig(App.CONFIG_FILE);
+    const config = await App.getConfig(CONFIG_FILE);
     if (!config["zerotierID"]) {
       const ztId = await Zerotier.auth();
-      await App.putConfig(App.CONFIG_FILE, { zerotierID: ztId });
+      await App.putConfig(CONFIG_FILE, { zerotierID: ztId });
     }
 
     await GH.auth();
 
     if (config["installed"] !== true) {
       log("Pseudo-Server successfully installed :)", "success");
-      await App.putConfig(App.CONFIG_FILE, { installed: true });
+      await App.putConfig(CONFIG_FILE, { installed: true });
     }
 
     await App.checkUpdates();
@@ -188,11 +188,11 @@ export default class App {
     await rm(App.PENDING_DIR, { recursive: true, force: true });
     await mkdir(App.PENDING_DIR, { recursive: true });
     await Tlauncher.setupServerVersion(serverVersion, serverName);
-    await rename(App.PENDING_DIR, join(App.INSTANCES_DIR, serverName));
+    await rename(App.PENDING_DIR, join(INSTANCES_DIR, serverName));
 
-    const config = await App.getConfig(App.CONFIG_FILE);
+    const config = await App.getConfig(CONFIG_FILE);
     const instances = (config["instances"] as Instance[]) ?? [];
     instances.push({ name: serverName, owner: "me", ready: false });
-    await App.putConfig(App.CONFIG_FILE, { instances });
+    await App.putConfig(CONFIG_FILE, { instances });
   }
 }

@@ -7,6 +7,7 @@ import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
 import App, { type Instance } from "./managers/app";
+import { CONFIG_FILE } from "./constants";
 
 tryCatch(
   async () => {
@@ -23,7 +24,7 @@ tryCatch(
         if (cancelled) return;
 
         if (value === "Zerotier Network ID") {
-          const config = await App.getConfig(App.CONFIG_FILE);
+          const config = await App.getConfig(CONFIG_FILE);
           const { value: newId, cancelled: inputCancelled } = await UI.input({
             title: "ZeroTier Network ID",
             defaultValue: (config["zerotierID"] as string) ?? "",
@@ -32,7 +33,7 @@ tryCatch(
           });
 
           if (inputCancelled) continue;
-          await App.putConfig(App.CONFIG_FILE, { zerotierID: newId });
+          await App.putConfig(CONFIG_FILE, { zerotierID: newId });
         }
       }
     };
@@ -62,7 +63,7 @@ tryCatch(
 
         while (step > 0 && step < 3) {
           if (step === 1) {
-            const config = await App.getConfig(App.CONFIG_FILE);
+            const config = await App.getConfig(CONFIG_FILE);
             const existing = (config["instances"] as Instance[]) ?? [];
 
             const { value, cancelled } = await UI.input({
@@ -111,7 +112,7 @@ tryCatch(
       }
 
       if (value === "= Choose Server") {
-        const config = await App.getConfig(App.CONFIG_FILE);
+        const config = await App.getConfig(CONFIG_FILE);
         const instances = (config["instances"] as Instance[]) ?? [];
         if (instances.length === 0) continue;
 

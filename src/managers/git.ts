@@ -1,14 +1,13 @@
 import { mkdir, writeFile } from "fs/promises";
 import { exists, randomNum, run, log, tryCatch } from "../utils";
-import { USER_NAME } from "../constants";
+import { USER_NAME, INSTANCES_DIR } from "../constants";
 import { join } from "path";
-import App from "./app";
 
 const serverName = "TEST"
 
 export default class Git {
   private static readonly PUSH_INTERVAL_MS = 30 * 60 * 1000;
-  private static readonly SERVER_DIR = join(App.INSTANCES_DIR, serverName, "server");
+  private static readonly SERVER_DIR = join(INSTANCES_DIR, serverName, "server");
   private static readonly WORLD_DIR = join(Git.SERVER_DIR, "world");
   private static readonly REPO_URL = "TEST"
 
@@ -130,7 +129,7 @@ export default class Git {
     }, "Failed server synchronization");
   }
 
-  static async serverPush(repoUrl: string, deployKeyPath: string) {
+  static async serverPush(_repoUrl: string, deployKeyPath: string) {
     await tryCatch(async () => {
       await run(
         [

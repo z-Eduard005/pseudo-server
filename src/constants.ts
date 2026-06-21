@@ -44,3 +44,9 @@ export const MC_DIR = join(
 
 export const GAME_DIR = join(MC_DIR, "game");
 export const DESKTOP_DIR = join(USER_DIR, "Desktop");
+export const APP_NAME = "Pseudo-Server";
+export const APP_DIR = IS_WIN32
+  ? join(USER_DIR, "AppData", "Roaming", "pseudo-server")
+  : join(USER_DIR, ".config", "pseudo-server");
+export const INSTANCES_DIR = join(APP_DIR, "instances");
+export const CONFIG_FILE = join(APP_DIR, "config.json");

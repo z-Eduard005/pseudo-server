@@ -1,4 +1,4 @@
-import { IS_WIN32, USER_DIR } from "../constants";
+import { IS_WIN32, USER_DIR, APP_NAME } from "../constants";
 import { color, isSuccess, log, run, throwErr, tryCatch } from "../utils";
 import { createInterface } from "readline";
 import Zerotier from "./zerotier";
@@ -6,7 +6,6 @@ import Git from "./git";
 import JDK from "./jdk";
 import Hosting from "./hosting";
 import UI from "./ui";
-import App from "./app";
 
 export default class Process {
   private static closing = false;
@@ -15,11 +14,11 @@ export default class Process {
     await tryCatch(async () => {
       let pids: number[];
       if (IS_WIN32) {
-        const out = await run(`tasklist /FI "IMAGENAME eq ${App.NAME}.exe" /NH`);
+        const out = await run(`tasklist /FI "IMAGENAME eq ${APP_NAME}.exe" /NH`);
         if (out.includes("No tasks")) return;
         pids = out.trim().split("\n").filter(Boolean).map(l => parseInt(l.trim().split(/\s+/)[1]!, 10)).filter(n => !isNaN(n) && n !== process.pid);
       } else {
-        const out = await run(`pgrep -x "${App.NAME}" || true`);
+        const out = await run(`pgrep -x "${APP_NAME}" || true`);
         if (out.trim() === "") return;
         pids = out.trim().split("\n").filter(Boolean).map(Number).filter(n => n !== process.pid);
       }
@@ -27,7 +26,7 @@ export default class Process {
 
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       const answer = await new Promise<string>((resolve) => {
-        rl.question(color(`Detected another ${App.NAME} app running\nKill it and continue here? (y/n): `, "warning"), (ans) => {
+        rl.question(color(`Detected another ${APP_NAME} app running\nKill it and continue here? (y/n): `, "warning"), (ans) => {
           rl.close();
           resolve(ans.trim().toLowerCase());
         });
