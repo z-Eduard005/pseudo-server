@@ -48,18 +48,18 @@ export default class GH {
     }
   }
 
-  static async ensureAuth() {
+  static async auth() {
     const authed = await isSuccess(async () => await run("gh auth status"));
     if (!authed) {
       log("GitHub account required for the program", "info");
+
+      run(`${IS_WIN32 ? "start" : "xdg-open"} "${GH.AUTH_URL}"`);
       await run(
-        [
-          `${IS_WIN32 ? "start" : "xdg-open"} "${GH.AUTH_URL}"`,
-          'echo "\r" | gh auth login --web --clipboard --git-protocol https --skip-ssh-key'
-        ], { inherit: true }
+        'echo "\r" | gh auth login --web --clipboard --git-protocol https --skip-ssh-key',
+        { inherit: true }
       );
 
-      await tryCatch(() => run("gh auth status"), "GitHub authentication check failed");
+      await tryCatch(async () => await run("gh auth status"), "GitHub authentication check failed");
     }
 
     await tryCatch(async () => {

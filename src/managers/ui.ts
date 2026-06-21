@@ -2,7 +2,7 @@ type LayoutOptions = {
   title?: string;
   desc?: string;
   backText?: string | null;
-  action?: { label: string; run: () => void };
+  action?: { label: string; run: () => void | Promise<void> };
 }
 
 type InputOptions = LayoutOptions & {
@@ -132,8 +132,10 @@ export default class UI {
   }
 
   static createAltScreen() {
-    process.stdout.write("\x1B[?25l\x1B[?1049h");
-    UI.altScreen = true;
+    if (!UI.altScreen) {
+      process.stdout.write("\x1B[?25l\x1B[?1049h");
+      UI.altScreen = true;
+    }
   }
 
   static restoreMainScreen() {
@@ -223,12 +225,16 @@ export default class UI {
     renderFrame();
 
     let lastAction = 0;
-    const onData = (key: string) => {
+    const onData = async (key: string) => {
       if (key === "\u000f" && action) {
         if (Date.now() - lastAction < 5000) return;
         lastAction = Date.now();
-        action.run();
+        stdin.removeListener("data", onData);
+        process.stdout.removeListener("resize", renderFrame);
+        await action.run();
         renderFrame();
+        stdin.on("data", onData);
+        process.stdout.on("resize", renderFrame);
         return;
       }
       handleKey(key);

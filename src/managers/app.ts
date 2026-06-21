@@ -167,7 +167,7 @@ export default class App {
     await Zerotier.install();
 
     await GH.installGit();
-    await GH.ensureAuth();
+    await GH.auth();
 
     const config = await App.getConfig(App.CONFIG_FILE);
     if (config["installed"] !== true) {

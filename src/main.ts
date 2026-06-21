@@ -14,12 +14,20 @@ tryCatch(
     await App.setup();
 
     let mainOptionIndex = 0;
+    const settingsList = async () => {
+      await UI.list(["Test 1", "Test 2", "Test 3"], { title: "Settings", backText: "Back" });
+    };
+
     while (true) {
       const { value, cancelled, index } = await UI.list([
         "Create Server Instance",
         "Choose Server",
         "Add New Server",
-      ], { title: UI.START_ART, desc: "Choose an option:", backText: "Exit", defaultValue: mainOptionIndex });
+      ], {
+        title: UI.START_ART, desc: "Choose an option:", backText: "Exit",
+        defaultValue: mainOptionIndex,
+        action: { label: "Settings", run: settingsList }
+      });
       mainOptionIndex = index;
 
       if (cancelled) await Process.stop();
