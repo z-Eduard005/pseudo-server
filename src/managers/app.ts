@@ -32,7 +32,7 @@ export default class App {
   static readonly INSTANCES_DIR = join(App.DIR, "instances");
   static readonly NAME = "Pseudo-Server";
   static readonly CONFIG_FILE = join(App.DIR, "config.json");
-  private static readonly VERSION = "0.0.15";
+  private static readonly VERSION = "0.0.17";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
@@ -127,7 +127,9 @@ export default class App {
 
   private static async checkUpdates() {
     await tryCatch(async () => {
-      const res = await UI.withLoader(async () => await fetch(App.RELEASE_URL));
+      const spiner1 = UI.spinner();
+      const res = await fetch(App.RELEASE_URL);
+      spiner1.stop();
       if (!res.ok) {
         log(`Update check failed:\n\nstatus: ${res.status}\nstatusText: ${res.statusText}\nbody: ${res.body}`, "warning");
         return;
@@ -141,7 +143,9 @@ export default class App {
       if (!asset) throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
 
       log(`Downloading ${release.tag_name}...`, "info");
-      const dl = await UI.withLoader(async () => await fetch(asset!.browser_download_url));
+      const spiner2 = UI.spinner();
+      const dl = await fetch(asset!.browser_download_url);
+      spiner2.stop();
       const buffer = Buffer.from(await dl.arrayBuffer());
 
       await writeFile(`${App.FILE}.tmp`, buffer);

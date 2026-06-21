@@ -61,16 +61,18 @@ export default class UI {
     return lines;
   }
 
-  static async withLoader<Result>(fn: () => Promise<Result>) {
+  static spinner(): { stop: () => void } {
     let i = 0;
     const id = setInterval(() => {
       process.stderr.write(`\r\x1B[2K${UI.LOADER_FRAMES[i++ % 10]}`);
     }, 80);
 
-    const result = await fn();
-    clearInterval(id);
-    process.stderr.write(`\r\x1B[2K`);
-    return result;
+    return {
+      stop: () => {
+        clearInterval(id);
+        process.stderr.write(`\r\x1B[2K`);
+      }
+    };
   }
 
   static loader(text?: string): { stop: () => void } {
