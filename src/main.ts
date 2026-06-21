@@ -6,16 +6,12 @@ import JDK from "./managers/jdk";
 import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
-import App from "./managers/app";
+import App, { type Instance } from "./managers/app";
 
 tryCatch(
   async () => {
     await Process.init();
     await App.setup();
-
-    const loader = UI.loader("TEST: Doing some stuff...");
-    await new Promise(r => setTimeout(r, 3000));
-    loader.stop();
 
     let mainOptionIndex = 0;
     while (true) {
@@ -36,11 +32,17 @@ tryCatch(
 
         while (step > 0 && step < 3) {
           if (step === 1) {
+            const config = await App.getConfig(App.CONFIG_FILE);
+            const existing = (config["instances"] as Instance[]) ?? [];
+
             const { value, cancelled } = await UI.input({
               title: `${color("[1|3]:", "info")} Server creation...`,
               filter: /[a-zA-Z_-]/,
               desc: "Type a name for your server instance:",
-              defaultValue: serverName
+              defaultValue: serverName,
+              validate: (name) => existing.some(i => i.name === name)
+                ? "This server name already exists"
+                : null
             });
 
             if (cancelled) { step = 0; break; }
@@ -71,7 +73,19 @@ tryCatch(
         break;
       }
 
-      if (value === "Choose Server") continue;
+      if (value === "Choose Server") {
+        const config = await App.getConfig(App.CONFIG_FILE);
+        const instances = (config["instances"] as Instance[]) ?? [];
+        if (instances.length === 0) continue;
+
+        const { value, cancelled } = await UI.list(
+          instances.map(i => i.name),
+          { title: "Choose Server", desc: "Select an instance to play on:" }
+        );
+
+        if (cancelled) continue;
+        continue;
+      }
       if (value === "Add New Server") continue;
     }
     UI.restoreMainScreen();

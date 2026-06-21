@@ -21,15 +21,21 @@ type GithubRelease = {
   }[]
 }
 
+export type Instance = {
+  name: string;
+  owner: string;
+  ready: boolean;
+}
+
 export default class App {
   static readonly DIR = IS_WIN32 ? join(USER_DIR, "AppData", "Roaming", "pseudo-server") : join(USER_DIR, ".config", "pseudo-server");
   static readonly INSTANCES_DIR = join(App.DIR, "instances");
   static readonly NAME = "Pseudo-Server";
+  static readonly CONFIG_FILE = join(App.DIR, "config.json");
   private static readonly VERSION = "0.0.15";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
-  private static readonly CONFIG_FILE = join(App.DIR, "config.json");
   private static readonly ICON_FILE = join(App.DIR, IS_WIN32 ? "icon.ico" : "icon.png");
   private static readonly SHORTCUT_FILE = join(App.DIR, `${App.NAME}.lnk`);
   private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
@@ -175,7 +181,8 @@ export default class App {
     await rename(App.PENDING_DIR, join(App.INSTANCES_DIR, serverName));
 
     const config = await App.getConfig(App.CONFIG_FILE);
-    const instances = (config["instances"] as string[]) ?? [];
-    await App.putConfig(App.CONFIG_FILE, { instances: [...instances, serverName] });
+    const instances = (config["instances"] as Instance[]) ?? [];
+    instances.push({ name: serverName, owner: "me", ready: false });
+    await App.putConfig(App.CONFIG_FILE, { instances });
   }
 }

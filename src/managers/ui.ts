@@ -9,6 +9,7 @@ type InputOptions = LayoutOptions & {
   defaultValue?: string;
   maxLen?: number;
   filter?: RegExp;
+  validate?: (value: string) => string | null;
 }
 
 type ListOptions = LayoutOptions & {
@@ -27,6 +28,7 @@ type Render = (
 
 export default class UI {
   private static altScreen = false;
+  private static loaderInterval: NodeJS.Timeout | null = null;
   private static readonly PADDING = 1;
   private static readonly BG = "\x1B[48;5;235m";
   private static readonly FG = "\x1B[38;5;255m";
@@ -103,16 +105,19 @@ export default class UI {
       return box;
     };
 
-    const { cleanup, rerender } = UI.render(draw, () => {}, { backText: null });
+    const { cleanup, rerender } = UI.render(draw, () => { }, { backText: null });
 
     const id = setInterval(() => {
       frame++;
       rerender();
     }, 40);
 
+    UI.loaderInterval = id;
+
     return {
       stop: () => {
         clearInterval(id);
+        UI.loaderInterval = null;
         cleanup();
         UI.restoreMainScreen();
       }
@@ -125,6 +130,10 @@ export default class UI {
   }
 
   static restoreMainScreen() {
+    if (UI.loaderInterval) {
+      clearInterval(UI.loaderInterval);
+      UI.loaderInterval = null;
+    }
     if (UI.altScreen) {
       process.stdout.removeAllListeners("resize");
       process.stdin.removeAllListeners("data");
@@ -380,7 +389,7 @@ export default class UI {
   }
 
   static input(layoutOptions?: InputOptions): Promise<{ value: string; cancelled: boolean }> {
-    const { defaultValue, maxLen, filter } = layoutOptions ?? {};
+    const { defaultValue, maxLen, filter, validate } = layoutOptions ?? {};
     return new Promise((resolve) => {
       let value = defaultValue ?? "";
       let cursorPos = value.length;
@@ -392,6 +401,7 @@ export default class UI {
 
       const getError = (): string | null => {
         if (value.length <= 3) return "Must be more than 3 symbols";
+        if (validate) return validate(value);
         return null;
       };
 
