@@ -41,7 +41,7 @@ export default class UI {
   private static readonly LOADER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   static readonly START_ART = `┏━┓┏━┓┏━╸╻ ╻╺┳┓┏━┓   ┏━┓┏━╸┏━┓╻ ╻┏━╸┏━┓
 ┣━┛┗━┓┣╸ ┃ ┃ ┃┃┃ ┃╺━╸┗━┓┣╸ ┣┳┛┃┏┛┣╸ ┣┳┛
-╹  ┗━┛┗━╸┗━┛╺┻┛┗━┛   ┗━┛┗━╸╹┗╸┗┛ ┗━╸╹┗╸`;
+╹  ┗━┛┗━╸┗━┛╺┻┛┗━┛   ┗━┛┗━╸╹┗╸┗┛ ┗━╸╹┗╸\n`;
 
   private static cols(): number {
     return process.stdout.columns || 80;
@@ -176,7 +176,7 @@ export default class UI {
         return;
       }
 
-      const backLine = `\x1B[2m<- ${backText || "Back"} (esc)\x1B[22m`;
+      const backLine = `\x1B[2m← ${backText || "Back"} (Esc)\x1B[22m`;
 
       const contentLines: string[] = [];
 
@@ -224,17 +224,14 @@ export default class UI {
 
     renderFrame();
 
-    let lastAction = 0;
     const onData = async (key: string) => {
       if (key === "\u000f" && action) {
-        if (Date.now() - lastAction < 5000) return;
-        lastAction = Date.now();
         stdin.removeListener("data", onData);
         process.stdout.removeListener("resize", renderFrame);
         await action.run();
         renderFrame();
-        stdin.on("data", onData);
         process.stdout.on("resize", renderFrame);
+        stdin.on("data", onData);
         return;
       }
       handleKey(key);

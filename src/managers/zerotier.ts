@@ -4,10 +4,12 @@ import { exists, retryRun, run, log, sudo, throwErr, tryCatch } from "../utils"
 import { setTimeout as setTimeoutPromise } from "timers/promises";
 import { join } from "path";
 import { networkInterfaces, tmpdir } from "os";
+import UI from "./ui";
 
 const ZT_NETWORK_ID = "TEST"
 
 export default class Zerotier {
+  private static readonly ZT_CENTRAL_URL = "https://central.zerotier.com/org/new";
   private static readonly FILE = IS_WIN32
     ? join("C:", "Program Files (x86)", "ZeroTier", "One", "zerotier-cli.bat")
     : join("/usr", "bin", "zerotier-cli");
@@ -133,5 +135,19 @@ export default class Zerotier {
         await Zerotier.setupSudoers();
       }
     }, "Zerotier is not installed");
+  }
+
+  static async auth(): Promise<string> {
+    run(IS_WIN32 ? `start "" "${Zerotier.ZT_CENTRAL_URL}"` : `xdg-open ${Zerotier.ZT_CENTRAL_URL}`);
+
+    const { value, cancelled } = await UI.input({
+      title: "ZeroTier Network Creation",
+      desc: `Opening: ${Zerotier.ZT_CENTRAL_URL} ...\n\n1) Create organization with any name\n2) Choose "$0" plan\n3) Copy and Paste (Ctrl+Shift+V) Network ID below:`,
+      backText: "Exit",
+      filter: /[a-z0-9]/
+    });
+
+    if (cancelled) throwErr("ZeroTier authorization is required");
+    return value;
   }
 }

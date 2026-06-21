@@ -32,7 +32,7 @@ export default class App {
   static readonly INSTANCES_DIR = join(App.DIR, "instances");
   static readonly NAME = "Pseudo-Server";
   static readonly CONFIG_FILE = join(App.DIR, "config.json");
-  private static readonly VERSION = "0.0.17";
+  private static readonly VERSION = "0.0.18";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(App.DIR, IS_WIN32 ? App.NAME + ".exe" : App.NAME);
@@ -164,12 +164,17 @@ export default class App {
     await App.moveBinnary();
 
     await Tlauncher.install();
+    await GH.installGit();
     await Zerotier.install();
 
-    await GH.installGit();
+    const config = await App.getConfig(App.CONFIG_FILE);
+    if (!config["zerotierID"]) {
+      const ztId = await Zerotier.auth();
+      await App.putConfig(App.CONFIG_FILE, { zerotierID: ztId });
+    }
+
     await GH.auth();
 
-    const config = await App.getConfig(App.CONFIG_FILE);
     if (config["installed"] !== true) {
       log("Pseudo-Server successfully installed :)", "success");
       await App.putConfig(App.CONFIG_FILE, { installed: true });

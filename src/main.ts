@@ -14,25 +14,45 @@ tryCatch(
     await App.setup();
 
     let mainOptionIndex = 0;
-    const settingsList = async () => {
-      await UI.list(["Test 1", "Test 2", "Test 3"], { title: "Settings", backText: "Back" });
+    const settingsAction = async () => {
+      while (true) {
+        const { value, cancelled } = await UI.list(
+          ["Zerotier Network ID"],
+          { title: "Settings", desc: "Change thoose on your own risk", backText: "Back" }
+        );
+        if (cancelled) return;
+
+        if (value === "Zerotier Network ID") {
+          const config = await App.getConfig(App.CONFIG_FILE);
+          const { value: newId, cancelled: inputCancelled } = await UI.input({
+            title: "ZeroTier Network ID",
+            defaultValue: (config["zerotierID"] as string) ?? "",
+            backText: "Back",
+            filter: /[a-z0-9]/
+          });
+
+          if (inputCancelled) continue;
+          await App.putConfig(App.CONFIG_FILE, { zerotierID: newId });
+        }
+      }
     };
 
     while (true) {
       const { value, cancelled, index } = await UI.list([
-        "Create Server Instance",
-        "Choose Server",
-        "Add New Server",
+        "✎ Create Server Instance",
+        "≡ Choose Server",
+        "⊕ Add New Server",
       ], {
         title: UI.START_ART, desc: "Choose an option:", backText: "Exit",
         defaultValue: mainOptionIndex,
-        action: { label: "Settings", run: settingsList }
+        action: { label: "⚙ Settings", run: settingsAction }
       });
       mainOptionIndex = index;
 
       if (cancelled) await Process.stop();
 
-      if (value === "Create Server Instance") {
+      if (value === "✎ Create Server Instance") {
+        let lastTlauncherLaunch = 0;
         let serverName = "";
         let serverVersion = "";
         let serverVersionIndex = -1;
@@ -64,7 +84,13 @@ tryCatch(
               title: `${color("[2|3]:", "info")} Server creation...`,
               desc: "Choose Minecraft version (install from tlauncher):",
               refresh: Tlauncher.installedVersions,
-              action: { label: "Open TLauncher", run: () => Tlauncher.launch() },
+              action: {
+                label: "▶ Open TLauncher", run: () => {
+                  if (Date.now() - lastTlauncherLaunch < 5000) return;
+                  lastTlauncherLaunch = Date.now();
+                  return Tlauncher.launch();
+                }
+              },
               defaultValue: serverVersionIndex
             });
 
@@ -81,7 +107,7 @@ tryCatch(
         break;
       }
 
-      if (value === "Choose Server") {
+      if (value === "≡ Choose Server") {
         const config = await App.getConfig(App.CONFIG_FILE);
         const instances = (config["instances"] as Instance[]) ?? [];
         if (instances.length === 0) continue;
@@ -94,7 +120,7 @@ tryCatch(
         if (cancelled) continue;
         continue;
       }
-      if (value === "Add New Server") continue;
+      if (value === "⊕ Add New Server") continue;
     }
     UI.restoreMainScreen();
 
