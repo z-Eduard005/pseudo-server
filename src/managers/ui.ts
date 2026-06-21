@@ -17,6 +17,11 @@ type ListOptions = LayoutOptions & {
   defaultValue?: number;
 }
 
+type ListItem = {
+  label: string;
+  badge?: string;
+}
+
 type Render = (
   draw: () => string,
   handleKey: (key: string) => void,
@@ -238,7 +243,9 @@ export default class UI {
     return { cleanup, rerender: renderFrame };
   }
 
-  static list(items: string[], layoutOptions?: ListOptions): Promise<{ value: string; index: number; cancelled: boolean }> {
+  static list(inputItems: (string | ListItem)[], layoutOptions?: ListOptions): Promise<{ value: string; index: number; cancelled: boolean }> {
+    const toItem = (i: string | ListItem): ListItem => typeof i === "string" ? { label: i } : i;
+    const items: ListItem[] = inputItems.map(toItem);
     return new Promise((resolve) => {
       let selectedIndex = layoutOptions?.defaultValue !== undefined
         ? Math.min(Math.max(0, layoutOptions.defaultValue), Math.max(0, items.length - 1))
@@ -259,7 +266,7 @@ export default class UI {
         const listIndent = " ".repeat(Math.max(0, listLeft));
         const emptyLine = `${listIndent}${UI.BG}${UI.FG}${" ".repeat(LIST_WIDTH)}${UI.RST}`;
 
-        const pool = filter ? items.filter(i => i.toLowerCase().includes(filter.toLowerCase())) : items;
+        const pool = filter ? items.filter(i => i.label.toLowerCase().includes(filter.toLowerCase())) : items;
         if (selectedIndex >= pool.length) selectedIndex = Math.max(0, pool.length - 1);
 
         const scrollNeeded = pool.length > MAX_VISIBLE;
@@ -301,18 +308,21 @@ export default class UI {
         const itemLines = visibleItems.flatMap((item, index) => {
           const actualIndex = scrollNeeded ? scrollOffset + index : index;
           const textWidth = TEXT_AREA - scrollBarWidth;
-          const wrapped = item.length > textWidth ? UI.wrap(item, textWidth) : [item];
+          const label = item.label;
+          const wrapped = label.length > textWidth ? UI.wrap(label, textWidth) : [label];
           return wrapped.map((l, i) => {
-            const plain = l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-            const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth);
-
             const isSelected = actualIndex === selectedIndex && i === 0;
             const bg = isSelected ? SEL_BG : UI.BG;
             const fg = isSelected ? SEL_FG : UI.FG;
+
+            const plain = l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
+            const BADGE_STYLE = "\x1B[48;5;196m\x1B[38;5;255m";
+            const badgeText = item.badge && i === 0 ? ` ${BADGE_STYLE}${item.badge}${bg}${fg}` : "";
+            const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth - (item.badge && i === 0 ? item.badge.length + 1 : 0));
             const style = i === 0 ? "\x1B[1m" : "";
             const resetStyle = i === 0 ? "\x1B[22m" : "";
 
-            let line = `${listIndent}${bg}${fg}${" ".repeat(UI.PADDING)}${style}${l}${resetStyle}${" ".repeat(rightFill)}`;
+            let line = `${listIndent}${bg}${fg}${" ".repeat(UI.PADDING)}${style}${l}${resetStyle}${" ".repeat(rightFill)}${badgeText}`;
             if (scrollNeeded) {
               line += `${scrollbarChars[index] ?? "\u2502"} `;
             }
@@ -332,9 +342,10 @@ export default class UI {
       if (layoutOptions?.refresh) {
         const refreshInterval = async () => {
           const newItems = await layoutOptions.refresh!();
-          if (JSON.stringify(newItems) !== JSON.stringify(items)) {
+          const newNormalized = newItems.map(toItem);
+          if (JSON.stringify(newNormalized) !== JSON.stringify(items)) {
             items.length = 0;
-            items.push(...newItems);
+            items.push(...newNormalized);
             rerender();
           }
         };
@@ -343,7 +354,7 @@ export default class UI {
       }
 
       keyHandler = (key) => {
-        const pool = filter ? items.filter(i => i.toLowerCase().includes(filter.toLowerCase())) : items;
+        const pool = filter ? items.filter(i => i.label.toLowerCase().includes(filter.toLowerCase())) : items;
 
         if (key === "\u001b") {
           cleanup();
@@ -353,7 +364,7 @@ export default class UI {
         if (key === "\r" || key === "\r\n") {
           if (pool.length === 0) return;
           cleanup();
-          resolve({ value: pool[selectedIndex]!, index: selectedIndex, cancelled: false });
+          resolve({ value: pool[selectedIndex]!.label, index: selectedIndex, cancelled: false });
           return;
         }
         if (key === "\u001b[A") {

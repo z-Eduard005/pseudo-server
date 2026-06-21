@@ -79,7 +79,7 @@ tryCatch(
         if (instances.length === 0) continue;
 
         const { value, cancelled } = await UI.list(
-          instances.map(i => i.name),
+          instances.map(i => ({ label: i.name, badge: i.ready ? "" : "Not Ready" })),
           { title: "Choose Server", desc: "Select an instance to play on:" }
         );
 
