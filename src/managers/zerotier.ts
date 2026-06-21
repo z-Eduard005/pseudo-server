@@ -6,8 +6,6 @@ import { join } from "path";
 import { networkInterfaces, tmpdir } from "os";
 import UI from "./ui";
 
-const ZT_NETWORK_ID = "TEST"
-
 export default class Zerotier {
   private static readonly ZT_CENTRAL_URL = "https://central.zerotier.com/org/new";
   private static readonly FILE = IS_WIN32
@@ -52,11 +50,11 @@ export default class Zerotier {
     }, "Failed to start zerotier")
   }
 
-  static async joinNetwork() {
+  static async join(id: string) {
     log("Joining zerotier network...", "info");
     const networks = await tryCatch(async () => {
       await run(
-        sudo(`"${Zerotier.FILE}" join ${ZT_NETWORK_ID}`),
+        sudo(`"${Zerotier.FILE}" join ${id}`),
         { inherit: true }
       );
       await setTimeoutPromise(Zerotier.CMD_TIMEOUT);
@@ -70,15 +68,6 @@ export default class Zerotier {
       !networks.includes("PRIVATE")
     )
       throwErr("Zerotier authorization failed (contact with admin of the server!)");
-  }
-
-  static async leaveNetwork() {
-    await tryCatch(() => {
-      return run(
-        sudo(`"${Zerotier.FILE}" leave ${ZT_NETWORK_ID}`),
-        { inherit: true }
-      );
-    }, "Failed to leave zerotier network", true)
   }
 
   static getIP() {

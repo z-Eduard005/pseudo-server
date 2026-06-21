@@ -17,9 +17,10 @@ type ListOptions = LayoutOptions & {
   defaultValue?: number;
 }
 
-type ListItem = {
+export type ListItem = {
   label: string;
   badge?: string;
+  badgeColor?: "red" | "green";
 }
 
 type Render = (
@@ -321,9 +322,11 @@ export default class UI {
             const fg = isSelected ? SEL_FG : UI.FG;
 
             const plain = l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-            const BADGE_STYLE = "\x1B[48;5;196m\x1B[38;5;255m";
-            const badgeText = item.badge && i === 0 ? ` ${BADGE_STYLE}${item.badge}${bg}${fg}` : "";
-            const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth - (item.badge && i === 0 ? item.badge.length + 1 : 0));
+            const BADGE_BG = item.badgeColor === "green" ? "42" : "48;5;196";
+            const BADGE_STYLE = `\x1B[${BADGE_BG}m\x1B[38;5;255m`;
+            const truncatedBadge = item.badge && item.badge.length > 10 ? item.badge.slice(0, 10) + "..." : item.badge;
+            const badgeText = truncatedBadge && i === 0 ? ` ${BADGE_STYLE}${truncatedBadge}${bg}${fg}` : "";
+            const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth - (truncatedBadge && i === 0 ? truncatedBadge.length + 1 : 0));
             const style = i === 0 ? "\x1B[1m" : "";
             const resetStyle = i === 0 ? "\x1B[22m" : "";
 

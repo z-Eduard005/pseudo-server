@@ -119,8 +119,6 @@ export default class Process {
     }
     Hosting.disableKeepAlive();
 
-    await Zerotier.leaveNetwork();
-
     if (successLog) log(successLog, "success");
 
     await Process.pause();

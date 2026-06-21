@@ -1,5 +1,5 @@
 import { log, tryCatch, throwErr, color } from "./utils";
-import UI from "./managers/ui";
+import UI, { type ListItem } from "./managers/ui";
 import Zerotier from "./managers/zerotier";
 import Git from "./managers/git";
 import JDK from "./managers/jdk";
@@ -18,7 +18,7 @@ tryCatch(
       while (true) {
         const { value, cancelled } = await UI.list(
           ["Zerotier Network ID"],
-          { title: "Settings", desc: "Change thoose on your own risk", backText: "Back" }
+          { title: "Settings", desc: "Change theese on your own risk", backText: "Back" }
         );
         if (cancelled) return;
 
@@ -41,9 +41,11 @@ tryCatch(
       const { value, cancelled, index } = await UI.list([
         "✏ Create Server Instance",
         "= Choose Server",
-        "+ Add New Server",
+        "+ Add New Server (Connect)",
       ], {
-        title: UI.START_ART, desc: "Choose an option:", backText: "Exit",
+        title: UI.START_ART,
+        desc: "Choose an option:",
+        backText: "Exit",
         defaultValue: mainOptionIndex,
         action: { label: "⛭ Settings", run: settingsAction }
       });
@@ -68,9 +70,10 @@ tryCatch(
               filter: /[a-zA-Z_-]/,
               desc: "Type a name for your server instance:",
               defaultValue: serverName,
-              validate: (name) => existing.some(i => i.name === name)
-                ? "This server name already exists"
-                : null
+              validate: (name) => {
+                if (name.length > 20) return "Server name too long (max 20)";
+                return existing.some(i => i.name === name) ? "This server name already exists" : null;
+              }
             });
 
             if (cancelled) { step = 0; break; }
@@ -113,14 +116,24 @@ tryCatch(
         if (instances.length === 0) continue;
 
         const { value, cancelled } = await UI.list(
-          instances.map(i => ({ label: i.name, badge: i.ready ? "" : "Not Ready" })),
+          instances.map(i => {
+            const item: ListItem = { label: i.name };
+            if (i.owner !== "me") {
+              item.badge = i.owner;
+              item.badgeColor = "green";
+            } else if (!i.ready) {
+              item.badge = "Not Ready";
+            }
+            return item;
+          }),
           { title: "Choose Server", desc: "Select an instance to play on:" }
         );
+        console.log(value);
 
         if (cancelled) continue;
         continue;
       }
-      if (value === "+ Add New Server") continue;
+      if (value === "+ Add New Server (Connect)") continue;
     }
     UI.restoreMainScreen();
 
@@ -129,10 +142,10 @@ tryCatch(
     await Tlauncher.checkAccountType();
 
     await Zerotier.start();
-    await Zerotier.joinNetwork();
+    await Zerotier.join("TEST");
     Zerotier.getIP();
 
-    await Tlauncher.chooseCustomVersion();
+    await Tlauncher.chooseVersion("TEST");
     await Tlauncher.open();
 
     await Hosting.startMonitoring();

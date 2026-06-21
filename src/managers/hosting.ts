@@ -41,7 +41,7 @@ export default class Hosting {
           const fullIP = `${msg.ip}:${JDK.PORT}`;
 
           log(`Someone is already playing on ${fullIP}`, "info");
-          Minecraft.addServerToMenu(fullIP);
+          Minecraft.addServer(fullIP, "TEST");
           Hosting.continueMonitoring();
         } else if (Hosting.ip === msg.ip) {
           Hosting.continueMonitoring();
@@ -52,7 +52,7 @@ export default class Hosting {
           const fullIP = `${msg.ip}:${JDK.PORT}`;
 
           log(`Reconecting to new host on ${fullIP}`, "info");
-          Minecraft.addServerToMenu(fullIP);
+          Minecraft.addServer(fullIP, "TEST");
           Hosting.continueMonitoring();
         }
       });
@@ -89,7 +89,7 @@ export default class Hosting {
 
     Hosting.confirmTimer = setTimeout(() => {
       log("Wait, you will be hosting...", "info");
-      Minecraft.addServerToMenu(`${Zerotier.ip}:${JDK.PORT}`);
+      Minecraft.addServer(`${Zerotier.ip}:${JDK.PORT}`, "TEST");
       Hosting.resolve();
     }, Hosting.CONFIRM_TIMEOUT);
   }

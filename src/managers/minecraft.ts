@@ -1,14 +1,10 @@
 import { join } from "path";
 import { tryCatch } from "../utils";
 import { rm, writeFile } from "fs/promises";
+import Tlauncher from "./tlauncher";
 
-const CUSTOM_VERSION_DIR = "TEST";
-const SERVER_NAME = "TEST";
 export default class Minecraft {
-  private static readonly SERVERS_BAK_FILE = join(CUSTOM_VERSION_DIR, "servers.dat.bak");
-  private static readonly SERVERS_FILE = join(CUSTOM_VERSION_DIR, "servers.dat");
-
-  private static serverToNBT(ip: string) {
+  private static serverToNBT(ip: string, name: string) {
     const startNBTFile =
       "\\00\\00\\09\\00\\07\\73\\65\\72\\76\\65\\72\\73\\0A\\00\\00\\";
     const serversLen = "00\\01";
@@ -34,7 +30,7 @@ export default class Minecraft {
       ipHexField,
       toHexWithLen(ip),
       nameHexField,
-      toHexWithLen(SERVER_NAME),
+      toHexWithLen(name),
       endNBTFile,
     ]
       .join("")
@@ -49,17 +45,16 @@ export default class Minecraft {
     return "\n" + buffer;
   };
 
-  static addServerToMenu(ip: string) {
+  static addServer(ip: string, name: string) {
+    const serversBakFile = join(Tlauncher.VERSIONS_DIR, name, "servers.dat.bak");
+    const serversFile = join(Tlauncher.VERSIONS_DIR, name, "servers.dat");
+
     tryCatch(
       async () => {
-        await rm(Minecraft.SERVERS_BAK_FILE, { force: true });
-        await writeFile(
-          Minecraft.SERVERS_FILE,
-          Minecraft.serverToNBT(ip),
-          "utf8"
-        );
+        await rm(serversBakFile, { force: true });
+        await writeFile(serversFile, Minecraft.serverToNBT(ip, name), "utf8");
       },
-      `The server was not added to the Minecraft menu automatically (incorrect path: ${Minecraft.SERVERS_FILE})`,
+      `The server was not added to the Minecraft menu automatically (incorrect path: ${serversFile})`,
       true
     );
   }

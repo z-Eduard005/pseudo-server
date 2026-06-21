@@ -1,15 +1,14 @@
 import { mkdir, writeFile } from "fs/promises";
 import { exists, randomNum, run, log, tryCatch } from "../utils";
 import { USER_NAME } from "../constants";
-import JDK from "./jdk";
 import { join } from "path";
+import App from "./app";
 
-const INSTANCE_DIR = "TEST";
+const serverName = "TEST"
 
 export default class Git {
   private static readonly PUSH_INTERVAL_MS = 30 * 60 * 1000;
-  private static readonly MC_FUNC_CHAT_SYNC_NAME = "-s:chat-w-sync";
-  private static readonly SERVER_DIR = join(INSTANCE_DIR, "server");
+  private static readonly SERVER_DIR = join(App.INSTANCES_DIR, serverName, "server");
   private static readonly WORLD_DIR = join(Git.SERVER_DIR, "world");
   private static readonly REPO_URL = "TEST"
 
@@ -20,7 +19,7 @@ export default class Git {
 
   static async worldInit() {
     await tryCatch(async () => {
-      await writeFile(join(Git.SERVER_DIR, ".gitignore"), "world/\n",);
+      await writeFile(join(Git.SERVER_DIR, ".gitignore"), "/world/\n",);
 
       if (await exists(Git.WORLD_DIR)) {
         await Git.worldSync();
@@ -62,7 +61,6 @@ export default class Git {
         ],
         { inherit: true, cwd: Git.WORLD_DIR }
       );
-      JDK.runMCCommand(`/function ${Git.MC_FUNC_CHAT_SYNC_NAME}`);
     }, "Error sending world to the cloud (check your internet)");
   };
 

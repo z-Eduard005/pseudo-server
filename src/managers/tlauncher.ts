@@ -6,10 +6,8 @@ import JDK from "./jdk";
 import UI from "./ui";
 import { spawn } from "child_process";
 
-const CUSTOM_VERSION = "TEST";
-
 export default class Tlauncher {
-  private static readonly VERSIONS_DIR = join(MC_DIR, "game", "versions");
+  static readonly VERSIONS_DIR = join(MC_DIR, "game", "versions");
   private static readonly PROPS_FILE = join(MC_DIR, "tl.properties");
   private static readonly PROPS_VERSION_ENTRY = "pseudo-server=V1";
   private static readonly FILENAME = IS_WIN32 ? "LL.exe" : "LL.sh";
@@ -63,19 +61,19 @@ export default class Tlauncher {
     }, `Error initializing tlauncher settings (check the destination folder - ${Tlauncher.PROPS_FILE})`);
   }
 
-  static async chooseCustomVersion() {
+  static async chooseVersion(serverName: string) {
     await tryCatch(
       async () => {
         return writeFile(
           Tlauncher.PROPS_FILE,
           Tlauncher.addProps(
             await readFile(Tlauncher.PROPS_FILE, "utf8"),
-            `login.version=${CUSTOM_VERSION}`
+            `login.version=${serverName}`
           ),
           "utf8"
         );
       },
-      `Choose "${CUSTOM_VERSION}" version manually in tlauncher`,
+      `Choose "${serverName}" version manually in tlauncher`,
       true
     );
   }
