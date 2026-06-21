@@ -39,19 +39,19 @@ tryCatch(
 
     while (true) {
       const { value, cancelled, index } = await UI.list([
-        "✎ Create Server Instance",
-        "≡ Choose Server",
-        "⊕ Add New Server",
+        "✏ Create Server Instance",
+        "= Choose Server",
+        "+ Add New Server",
       ], {
         title: UI.START_ART, desc: "Choose an option:", backText: "Exit",
         defaultValue: mainOptionIndex,
-        action: { label: "⚙ Settings", run: settingsAction }
+        action: { label: "⛭ Settings", run: settingsAction }
       });
       mainOptionIndex = index;
 
       if (cancelled) await Process.stop();
 
-      if (value === "✎ Create Server Instance") {
+      if (value === "✏ Create Server Instance") {
         let lastTlauncherLaunch = 0;
         let serverName = "";
         let serverVersion = "";
@@ -85,10 +85,10 @@ tryCatch(
               desc: "Choose Minecraft version (install from tlauncher):",
               refresh: Tlauncher.installedVersions,
               action: {
-                label: "▶ Open TLauncher", run: () => {
+                label: "> Open TLauncher", run: () => {
                   if (Date.now() - lastTlauncherLaunch < 5000) return;
                   lastTlauncherLaunch = Date.now();
-                  return Tlauncher.launch();
+                  return Tlauncher.open();
                 }
               },
               defaultValue: serverVersionIndex
@@ -107,7 +107,7 @@ tryCatch(
         break;
       }
 
-      if (value === "≡ Choose Server") {
+      if (value === "= Choose Server") {
         const config = await App.getConfig(App.CONFIG_FILE);
         const instances = (config["instances"] as Instance[]) ?? [];
         if (instances.length === 0) continue;
@@ -120,7 +120,7 @@ tryCatch(
         if (cancelled) continue;
         continue;
       }
-      if (value === "⊕ Add New Server") continue;
+      if (value === "+ Add New Server") continue;
     }
     UI.restoreMainScreen();
 
@@ -132,9 +132,8 @@ tryCatch(
     await Zerotier.joinNetwork();
     Zerotier.getIP();
 
-    await Tlauncher.initSettings();
     await Tlauncher.chooseCustomVersion();
-    Tlauncher.launch();
+    await Tlauncher.open();
 
     await Hosting.startMonitoring();
 

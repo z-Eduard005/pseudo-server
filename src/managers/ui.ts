@@ -469,6 +469,7 @@ export default class UI {
       const { cleanup, rerender } = UI.render(draw, (key) => keyHandler(key), layoutOptions);
 
       keyHandler = (key) => {
+        if (key === "\x16") return;
         if (key === "\u001b") {
           cleanup();
           resolve({ value, cancelled: true });

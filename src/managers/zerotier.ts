@@ -138,7 +138,7 @@ export default class Zerotier {
   }
 
   static async auth(): Promise<string> {
-    run(IS_WIN32 ? `start "" "${Zerotier.ZT_CENTRAL_URL}"` : `xdg-open ${Zerotier.ZT_CENTRAL_URL}`);
+    run(`${IS_WIN32 ? 'start ""' : "xdg-open"} "${Zerotier.ZT_CENTRAL_URL}"`);
 
     const { value, cancelled } = await UI.input({
       title: "ZeroTier Network Creation",
@@ -146,6 +146,7 @@ export default class Zerotier {
       backText: "Exit",
       filter: /[a-z0-9]/
     });
+    UI.restoreMainScreen();
 
     if (cancelled) throwErr("ZeroTier authorization is required");
     return value;

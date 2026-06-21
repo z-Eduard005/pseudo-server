@@ -53,7 +53,7 @@ export default class GH {
     if (!authed) {
       log("GitHub account required for the program", "info");
 
-      run(`${IS_WIN32 ? "start" : "xdg-open"} "${GH.AUTH_URL}"`);
+      run(`${IS_WIN32 ? 'start ""' : "xdg-open"} "${GH.AUTH_URL}"`);
       await run(
         'echo "\r" | gh auth login --web --clipboard --git-protocol https --skip-ssh-key',
         { inherit: true }

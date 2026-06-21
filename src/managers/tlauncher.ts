@@ -4,6 +4,7 @@ import { join, extname } from "path";
 import { IS_WIN32, MC_DIR } from "../constants";
 import JDK from "./jdk";
 import UI from "./ui";
+import { spawn } from "child_process";
 
 const CUSTOM_VERSION = "TEST";
 
@@ -30,8 +31,6 @@ export default class Tlauncher {
     "minecraft.versions.sub.remote=true",
     "minecraft.versions.modified=true",
     "minecraft.servers.promoted.ingame=false",
-    "locale=ru_RU",
-    "contributors=ru_RU",
     "minecraft.onlaunch=exit",
     "minecraft.gamedir.separate=version",
   ];
@@ -50,24 +49,15 @@ export default class Tlauncher {
           : `${props}\n${entry}`;
       }
     );
-    return `${replaceEntry(
-      props,
-      Tlauncher.PROPS_VERSION_ENTRY.split("=")[0]!,
-      ""
-    )}\n${Tlauncher.PROPS_VERSION_ENTRY}`;
+
+    const result = replaceEntry(props, Tlauncher.PROPS_VERSION_ENTRY.split("=")[0]!, "");
+    return `${result}\n${Tlauncher.PROPS_VERSION_ENTRY}`;
   };
 
   static async initSettings() {
     await tryCatch(async () => {
       const props = await readFile(Tlauncher.PROPS_FILE, "utf8");
-
-      if (props.includes(Tlauncher.PROPS_VERSION_ENTRY)) {
-        return;
-      }
-      log("Updating tlauncher settings...", "info");
-      const requiredProps = Tlauncher.REQUIRED_PROPS.map((p) => {
-        return p.replaceAll("_RAM_VALUE_", JDK.ram.toString());
-      });
+      const requiredProps = Tlauncher.REQUIRED_PROPS.map(p => p.replaceAll("_RAM_VALUE_", JDK.ram.toString()));
 
       await writeFile(Tlauncher.PROPS_FILE, Tlauncher.addProps(props, requiredProps), "utf8");
     }, `Error initializing tlauncher settings (check the destination folder - ${Tlauncher.PROPS_FILE})`);
@@ -100,15 +90,19 @@ export default class Tlauncher {
     }, err);
   }
 
-  static async launch() {
+  static async open() {
     await tryCatch(
       async () => {
         await run(
           IS_WIN32
-            ? `taskkill /f /im "${Tlauncher.FILENAME}" 2>nul`
+            ? `taskkill /f /im "${Tlauncher.FILENAME}" 2>nul || ver>nul`
             : `ps aux | grep '[t]launcher' | grep ${Tlauncher.FILENAME.split(".")[0]}.exe | awk '{print $2}' | xargs -r kill`,
         );
-        run(Tlauncher.FILE);
+        spawn(Tlauncher.FILE, {
+          detached: true,
+          stdio: "ignore",
+          shell: false,
+        }).unref();
       },
       `Tlauncher not launched automatically (check path: ${Tlauncher.FILE})`,
       true
@@ -121,6 +115,8 @@ export default class Tlauncher {
     log(
       `This server works only with legacy-launcher${IS_WIN32 ? "\nInstall tlauncher first (from opening link) and try later..." : " and steam-proton setup\nInstalling using 'github.com/z-Eduard005/fedora-mc-installer' script..."}`, "warning"
     );
+
+    if (IS_WIN32) log("\nPlease restart, after tlauncher installed", "success");
     await tryCatch(
       () => {
         return run(
@@ -129,15 +125,17 @@ export default class Tlauncher {
         );
       }, "Error while installing tlauncher (check your internet)"
     )
+    if (!IS_WIN32) log("\nPlease restart, after tlauncher installed", "success");
 
-    log("Please restart now, after tlauncher installed", "success");
     throwErr();
   }
 
   static async installedVersions(): Promise<string[]> {
     return await tryCatch(async () => {
       const entries = await readdir(Tlauncher.VERSIONS_DIR, { withFileTypes: true });
-      return entries.filter(e => e.isDirectory()).map(e => e.name).sort();
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      const hasJar = await Promise.all(dirs.map(d => exists(join(Tlauncher.VERSIONS_DIR, d, `${d}.jar`))));
+      return dirs.filter((_, i) => hasJar[i]).sort();
     }, "Failed to read installed versions");
   }
 
