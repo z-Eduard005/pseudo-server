@@ -32,7 +32,7 @@ tryCatch(
           const config = await App.getConfig(CONFIG_FILE);
           const { value: newId, cancelled: inputCancelled } = await UI.input({
             title: "ZeroTier Network ID",
-            desc: `Your personal Network ID\nYoucan get it from - ${Zerotier.ADMIN_URL}`,
+            desc: `Your personal Network ID\nYou can get it from - ${Zerotier.ADMIN_URL}`,
             defaultValue: (config["zerotierID"] as string) ?? "",
             filter: /[a-z0-9]/
           });
@@ -53,7 +53,8 @@ tryCatch(
         desc: "Choose an option:",
         backText: "Exit",
         defaultValue: mainOptionIndex,
-        action: { label: "⛭ Settings", run: settingsAction }
+        action: { label: "⛭ Settings", run: settingsAction },
+        footerText: "'Ctrl + Scroll' to zoom"
       });
       mainOptionIndex = index;
 

@@ -16,6 +16,7 @@ type ListOptions = LayoutOptions & {
   refresh?: () => Promise<string[]>;
   defaultValue?: number;
   lockable?: boolean;
+  footerText?: string;
 }
 
 export type ListItem = {
@@ -342,7 +343,13 @@ export default class UI {
 
         const hint = "\u2191 \u2193 to move";
         const hintIndent = " ".repeat(Math.max(0, Math.floor((UI.cols() - hint.length) / 2)));
-        return [(searchVisible ? searchLine : emptyLine), ...itemLines, emptyLine, `${hintIndent}\x1B[2m${hint}\x1B[22m`].join("\n");
+        const listLines = [(searchVisible ? searchLine : emptyLine), ...itemLines, emptyLine, `${hintIndent}\x1B[2m${hint}\x1B[22m`];
+        if (layoutOptions?.footerText) {
+          const f = layoutOptions.footerText;
+          const fi = " ".repeat(Math.max(0, Math.floor((UI.cols() - f.length) / 2)));
+          listLines.push(`${fi}\x1B[2m${f}\x1B[22m`);
+        }
+        return listLines.join("\n");
       };
 
       const { cleanup: origCleanup, rerender } = UI.render(draw, (key) => keyHandler(key), layoutOptions);
