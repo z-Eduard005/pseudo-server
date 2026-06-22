@@ -145,10 +145,13 @@ export default class App {
       log(`Downloading ${release.tag_name}...`, "info");
       const spiner2 = UI.spinner();
       const dl = await fetch(asset!.browser_download_url);
-      spiner2.stop();
       const buffer = Buffer.from(await dl.arrayBuffer());
+      spiner2.stop();
 
       await writeFile(`${App.FILE}.tmp`, buffer);
+      const oldFile = `${App.FILE}.old`;
+      if (await exists(oldFile)) await rm(oldFile, { force: true });
+      await rename(App.FILE, oldFile);
       await rename(`${App.FILE}.tmp`, App.FILE);
       if (!IS_WIN32) await run(`chmod +x ${App.FILE}`);
 
