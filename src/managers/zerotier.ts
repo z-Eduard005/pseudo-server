@@ -7,7 +7,8 @@ import { networkInterfaces, tmpdir } from "os";
 import UI from "./ui";
 
 export default class Zerotier {
-  private static readonly ZT_CENTRAL_URL = "https://central.zerotier.com/org/new";
+  private static readonly ADMIN_URL = "https://central.zerotier.com";
+  private static readonly NEW_ORG_URL = `${Zerotier.ADMIN_URL}/org/new`;
   private static readonly FILE = IS_WIN32
     ? join("C:", "Program Files (x86)", "ZeroTier", "One", "zerotier-cli.bat")
     : join("/usr", "bin", "zerotier-cli");
@@ -20,7 +21,7 @@ export default class Zerotier {
   private static readonly SUDOERS_CONTENT = `${USER_NAME} ALL=(ALL) NOPASSWD: ${Zerotier.FILE} *`;
   private static readonly CMD_TIMEOUT = 4000;
 
-  static readonly START_IP = "10.242";
+  static readonly START_IP = "10.69.55";
   static ip: string | null = null;
 
   private static async setupSudoers() {
@@ -68,6 +69,10 @@ export default class Zerotier {
       !networks.includes("PRIVATE")
     )
       throwErr("Zerotier authorization failed (contact with admin of the server!)");
+  }
+
+  static async leave(id: string) {
+    await tryCatch(async () => await run(sudo(`"${Zerotier.FILE}" leave ${id}`), { inherit: true }))
   }
 
   static getIP() {
@@ -127,11 +132,11 @@ export default class Zerotier {
   }
 
   static async auth(): Promise<string> {
-    run(`${IS_WIN32 ? 'start ""' : "xdg-open"} "${Zerotier.ZT_CENTRAL_URL}"`);
+    run(`${IS_WIN32 ? 'start ""' : "xdg-open"} "${Zerotier.NEW_ORG_URL}"`);
 
     const { value, cancelled } = await UI.input({
       title: "ZeroTier Network Creation",
-      desc: `Opening: ${Zerotier.ZT_CENTRAL_URL} ...\n\n1) Create organization with any name\n2) Choose "$0" plan\n3) Copy and Paste (Ctrl+Shift+V) Network ID below:`,
+      desc: `Opening: ${Zerotier.NEW_ORG_URL} ...\n\n1) Create organization with any name\n2) Choose "$0" plan\n3) Copy and Paste (Ctrl+Shift+V) Network ID below:`,
       backText: "Exit",
       filter: /[a-z0-9]/
     });

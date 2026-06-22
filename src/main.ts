@@ -119,11 +119,14 @@ tryCatch(
         const { value, cancelled } = await UI.list(
           instances.map(i => {
             const item: ListItem = { label: i.name };
-            if (i.owner !== "me") {
-              item.badge = i.owner;
-              item.badgeColor = "green";
-            } else if (!i.ready) {
+            if (!i.ready) {
               item.badge = "Not Ready";
+            } else if (i.owner === "me") {
+              item.badge = "★";
+              item.badgeColor = "green";
+            } else {
+              item.badge = `☆ ${i.owner}`;
+              item.badgeColor = "yellow";
             }
             return item;
           }),

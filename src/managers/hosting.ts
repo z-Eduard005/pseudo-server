@@ -8,7 +8,7 @@ type BroadcastData = { type: string; ip: string }
 
 export default class Hosting {
   private static readonly BROADCAST_PORT = 42069;
-  private static readonly BROADCASTIP = `${Zerotier.START_IP}.255.255`;
+  private static readonly BROADCASTIP = `${Zerotier.START_IP}.255`;
   private static readonly LISTEN_TIMEOUT = 5_000;
   private static readonly HEARTBEAT_INTERVAL = 3_000;
   private static readonly CONFIRM_TIMEOUT = 1_000;

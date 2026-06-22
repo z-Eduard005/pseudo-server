@@ -117,6 +117,7 @@ export default class Process {
       );
     }
     Hosting.disableKeepAlive();
+    await Zerotier.leave("TEST");
 
     if (successLog) log(successLog, "success");
 

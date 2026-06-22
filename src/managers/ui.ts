@@ -20,7 +20,7 @@ type ListOptions = LayoutOptions & {
 export type ListItem = {
   label: string;
   badge?: string;
-  badgeColor?: "red" | "green";
+  badgeColor?: "red" | "green" | "yellow";
 }
 
 type Render = (
@@ -322,8 +322,7 @@ export default class UI {
             const fg = isSelected ? SEL_FG : UI.FG;
 
             const plain = l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-            const BADGE_BG = item.badgeColor === "green" ? "42" : "48;5;196";
-            const BADGE_STYLE = `\x1B[${BADGE_BG}m\x1B[38;5;255m`;
+            const BADGE_STYLE = item.badgeColor === "green" ? "\x1B[32m\x1B[1m" : item.badgeColor === "yellow" ? "\x1B[33m\x1B[1m" : "\x1B[48;5;196m\x1B[38;5;255m";
             const truncatedBadge = item.badge && item.badge.length > 10 ? item.badge.slice(0, 10) + "..." : item.badge;
             const badgeText = truncatedBadge && i === 0 ? ` ${BADGE_STYLE}${truncatedBadge}${bg}${fg}` : "";
             const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth - (truncatedBadge && i === 0 ? truncatedBadge.length + 1 : 0));
