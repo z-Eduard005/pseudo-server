@@ -21,7 +21,7 @@ export default class JDK {
   private static readonly MIN_RAM_MB = 2700;
   private static readonly MAX_RAM_MB = 7168;
   private static readonly MAX_RAM_PERCENTAGE = 0.4;
-  static readonly PORT = "25565";
+  static readonly PORT = "42069";
   static ram = JDK.MIN_RAM_MB;
   static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 

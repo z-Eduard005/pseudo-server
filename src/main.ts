@@ -23,7 +23,7 @@ tryCatch(
             title: "Settings",
             desc: "Change theese on your own risk",
             lockable: true,
-            action: { label: "⚷ Unlock", run: () => { } }
+            action: { label: "🔒︎ Unlock", run: () => { } }
           }
         );
         if (cancelled) return;
@@ -45,7 +45,7 @@ tryCatch(
 
     while (true) {
       const { value, cancelled, index } = await UI.list([
-        "✏ Create Server Instance",
+        "> Create Server Instance",
         "= Choose Server",
         "+ Add New Server (Connect)",
       ], {
@@ -60,7 +60,7 @@ tryCatch(
 
       if (cancelled) await Process.stop();
 
-      if (value === "✏ Create Server Instance") {
+      if (value === "> Create Server Instance") {
         let lastTlauncherLaunch = 0;
         let serverName = "";
         let serverVersion = "";
