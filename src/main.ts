@@ -18,8 +18,13 @@ tryCatch(
     const settingsAction = async () => {
       while (true) {
         const { value, cancelled } = await UI.list(
-          ["Zerotier Network ID"],
-          { title: "Settings", desc: "Change theese on your own risk", backText: "Back" }
+          [{ label: "Zerotier Network ID", badge: "locked" }, { label: "test", badge: "locked" }],
+          {
+            title: "Settings",
+            desc: "Change theese on your own risk",
+            lockable: true,
+            action: { label: "⚷ Unlock", run: () => { } }
+          }
         );
         if (cancelled) return;
 
@@ -27,8 +32,8 @@ tryCatch(
           const config = await App.getConfig(CONFIG_FILE);
           const { value: newId, cancelled: inputCancelled } = await UI.input({
             title: "ZeroTier Network ID",
+            desc: `Your personal Network ID\nYoucan get it from - ${Zerotier.ADMIN_URL}`,
             defaultValue: (config["zerotierID"] as string) ?? "",
-            backText: "Back",
             filter: /[a-z0-9]/
           });
 

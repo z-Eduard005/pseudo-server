@@ -7,7 +7,7 @@ import { networkInterfaces, tmpdir } from "os";
 import UI from "./ui";
 
 export default class Zerotier {
-  private static readonly ADMIN_URL = "https://central.zerotier.com";
+  static readonly ADMIN_URL = "https://central.zerotier.com";
   private static readonly NEW_ORG_URL = `${Zerotier.ADMIN_URL}/org/new`;
   private static readonly FILE = IS_WIN32
     ? join("C:", "Program Files (x86)", "ZeroTier", "One", "zerotier-cli.bat")

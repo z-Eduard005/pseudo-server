@@ -15,6 +15,7 @@ type InputOptions = LayoutOptions & {
 type ListOptions = LayoutOptions & {
   refresh?: () => Promise<string[]>;
   defaultValue?: number;
+  lockable?: boolean;
 }
 
 export type ListItem = {
@@ -231,6 +232,7 @@ export default class UI {
         process.stdout.removeListener("resize", renderFrame);
         await action.run();
         renderFrame();
+        handleKey(key);
         process.stdout.on("resize", renderFrame);
         stdin.on("data", onData);
         return;
@@ -367,6 +369,24 @@ export default class UI {
           cleanup();
           resolve({ value: "", index: selectedIndex, cancelled: true });
           return;
+        }
+        if (layoutOptions?.lockable) {
+          if (key === "\u000f") {
+            const item = pool[selectedIndex];
+            if (item) {
+              if (item.badge === "locked") {
+                delete item.badge;
+              } else {
+                item.badge = "locked";
+              }
+              rerender();
+            }
+            return;
+          }
+          if (key === "\r" || key === "\r\n") {
+            if (pool.length === 0) return;
+            if (pool[selectedIndex]?.badge === "locked") return;
+          }
         }
         if (key === "\r" || key === "\r\n") {
           if (pool.length === 0) return;
