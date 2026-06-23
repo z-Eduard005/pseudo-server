@@ -3,7 +3,7 @@ import { color, isSuccess, log, run, throwErr, tryCatch } from "../utils";
 import { createInterface } from "readline";
 import Zerotier from "./zerotier";
 import Git from "./git";
-import JDK from "./jdk";
+import Java from "./java";
 import Hosting from "./hosting";
 import UI from "./ui";
 
@@ -108,7 +108,7 @@ export default class Process {
     UI.restoreMainScreen();
 
     Git.worldDisableRepeatedPush();
-    await JDK.kill();
+    await Java.kill();
 
     if (Hosting.ip === Zerotier.ip && Git.worldInitialized) {
       await tryCatch(

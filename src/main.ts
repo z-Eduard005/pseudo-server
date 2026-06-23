@@ -2,7 +2,7 @@ import { log, tryCatch, throwErr, color } from "./utils";
 import UI, { type ListItem } from "./managers/ui";
 import Zerotier from "./managers/zerotier";
 import Git from "./managers/git";
-import JDK from "./managers/jdk";
+import Java from "./managers/java";
 import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
@@ -94,7 +94,7 @@ tryCatch(
           }
           if (step === 2) {
             const getAvailableVersions = async () => {
-              return (await Tlauncher.installedVersions(existing.map(i => i.name))).map(JDK.toVersionOption)
+              return (await Tlauncher.installedVersions(existing.map(i => i.name))).map(Java.toVersionOption)
             }
             const versionItems = await getAvailableVersions();
 
@@ -155,7 +155,7 @@ tryCatch(
     }
     UI.restoreMainScreen();
 
-    JDK.getRam();
+    Java.getRam();
 
     await Tlauncher.checkAccountType();
 
@@ -170,29 +170,29 @@ tryCatch(
 
     await Git.worldInit();
 
-    await JDK.generateServerSettings(Zerotier.ip!, "TEST");
-    await JDK.start("TEST");
+    await Java.generateServerSettings(Zerotier.ip!, "TEST");
+    await Java.start("TEST");
 
-    JDK.process?.on("error", async (err) => {
-      throwErr(`Error starting Java server. Check path to Java: ${JDK.getJavaPath("TEST")}\n${err}`);
+    Java.process?.on("error", async (err) => {
+      throwErr(`Error starting Java server. Check path to Java: ${Java.getJavaPath("TEST")}\n${err}`);
     });
-    JDK.process?.on("close", async (code) => {
+    Java.process?.on("close", async (code) => {
       if (code !== 0) {
         throwErr(`Server terminated with an error (code: ${code})`);
       }
       await Process.stop("Server successfully stopped");
     });
-    JDK.process?.stdout.on("data", async (data) => {
+    Java.process?.stdout.on("data", async (data) => {
       process.stdout.write(data);
 
       const ADMIN_NAME = "TEST";
 
       if (data.includes(`${ADMIN_NAME} joined the game`)) {
-        JDK.runMCCommand(`op ${ADMIN_NAME}`);
+        Java.runMCCommand(`op ${ADMIN_NAME}`);
       }
 
       if (data.includes("Unloading dimension 1")) {
-        log(`You have started the server on port: ${Zerotier.ip}:${JDK.PORT}\nHave fun playing :)`, "success");
+        log(`You have started the server on port: ${Zerotier.ip}:${Java.PORT}\nHave fun playing :)`, "success");
 
         Git.worldEnableRepeatedPush();
       }

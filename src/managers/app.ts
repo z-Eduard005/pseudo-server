@@ -16,7 +16,7 @@ import Tlauncher from "./tlauncher";
 import Process from "./process";
 import GH from "./gh";
 import UI from "./ui";
-import JDK from "./jdk";
+import Java from "./java";
 
 type GithubRelease = {
   tag_name: string;
@@ -30,6 +30,7 @@ export type Instance = {
   name: string;
   owner: string;
   ready: boolean;
+  version: string;
 }
 
 export default class App {
@@ -125,9 +126,9 @@ export default class App {
 
   private static async checkUpdates() {
     await tryCatch(async () => {
-      const spiner1 = UI.spinner();
+      const spiner = UI.spinner();
       const res = await fetch(App.RELEASE_URL);
-      spiner1.stop();
+      spiner.stop();
       if (!res.ok) {
         log(`Update check failed:\n\nstatus: ${res.status}\nstatusText: ${res.statusText}\nbody: ${res.body}`, "warning");
         return;
@@ -140,11 +141,10 @@ export default class App {
       const asset = release.assets.find(a => a.name === assetName);
       if (!asset) throwErr(`No download found for ${assetName} in release ${release.tag_name}`);
 
-      log(`Downloading ${release.tag_name}...`, "info");
-      const spiner2 = UI.spinner();
+      const loader = UI.loader(`Downloading ${release.tag_name}...`);
       const dl = await fetch(asset!.browser_download_url);
       const buffer = Buffer.from(await dl.arrayBuffer());
-      spiner2.stop();
+      loader.stop();
 
       await writeFile(`${App.FILE}.tmp`, buffer);
       if (await exists(`${App.FILE}.old`)) await rm(`${App.FILE}.old`, { force: true });
@@ -165,7 +165,7 @@ export default class App {
 
     await Tlauncher.install();
     await Tlauncher.initSettings();
-    await JDK.installAll();
+    await Java.installAll();
     await GH.install();
     await Zerotier.install();
 
@@ -191,9 +191,10 @@ export default class App {
     await Tlauncher.setupServerVersion(serverVersion, serverName);
     await rename(App.PENDING_DIR, join(INSTANCES_DIR, serverName));
 
+    const version = serverVersion.match(/(\d+\.\d+(?:\.\d+)?)/)?.[0] ?? serverVersion;
     const config = await App.getConfig(CONFIG_FILE);
     const instances = (config["instances"] as Instance[]) ?? [];
-    instances.push({ name: serverName, owner: "me", ready: false });
+    instances.push({ name: serverName, owner: "me", ready: false, version });
     await App.putConfig(CONFIG_FILE, { instances });
   }
 }

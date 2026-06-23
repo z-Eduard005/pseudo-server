@@ -19,24 +19,24 @@ type AdoptiumAsset = {
   };
 };
 
-export default class JDK {
+export default class Java {
   static readonly DIR = join(APP_DIR, "jdk");
 
   private static readonly MIN_RAM_MB = 2700;
   private static readonly MAX_RAM_MB = 7168;
   private static readonly MAX_RAM_PERCENTAGE = 0.4;
   static readonly PORT = "42069";
-  static ram = JDK.MIN_RAM_MB;
+  static ram = Java.MIN_RAM_MB;
   static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 
   static async start(serverName: string) {
     log("Server is loading...", "info");
-    JDK.process = await tryCatch(() => {
+    Java.process = await tryCatch(() => {
       return spawn(
-        "JDK.FILE",
+        "Java.FILE",
         [
-          `-Xmx${JDK.ram}M`,
-          `-Xms${JDK.ram}M`,
+          `-Xmx${Java.ram}M`,
+          `-Xms${Java.ram}M`,
           "-jar",
           join(INSTANCES_DIR, serverName, "server", "server.jar (more letters i guess)"),
           "nogui",
@@ -48,12 +48,12 @@ export default class JDK {
         }
       );
     }, "Error while starting java server")
-    JDK.process.stdout.setEncoding("utf8");
+    Java.process.stdout.setEncoding("utf8");
   }
 
   static runMCCommand(cmd: string) {
-    if (JDK.process?.stdin.writable) {
-      JDK.process.stdin.write(cmd + "\n");
+    if (Java.process?.stdin.writable) {
+      Java.process.stdin.write(cmd + "\n");
     }
   }
 
@@ -63,7 +63,7 @@ export default class JDK {
       () => {
         return writeFile(
           join(INSTANCES_DIR, serverName, "server", "server.properties"),
-          JDK.SERVER_PROPS.replace("server-ip=", "server-ip=" + ip),
+          Java.SERVER_PROPS.replace("server-ip=", "server-ip=" + ip),
           "utf8"
         );
       },
@@ -76,30 +76,30 @@ export default class JDK {
       const allVersions = [25, 21, 17, 16, 8];
       const toInstall: number[] = [];
       for (const ver of allVersions) {
-        const dir = join(JDK.DIR, `jdk${ver}`);
+        const dir = join(Java.DIR, `jdk${ver}`);
         if (!await exists(join(dir, "bin", IS_WIN32 ? "java.exe" : "java"))) {
           toInstall.push(ver);
         }
       }
       for (let i = 0; i < toInstall.length; i++) {
-        await JDK.install(toInstall[i]!, i + 1, toInstall.length);
+        await Java.install(toInstall[i]!, i + 1, toInstall.length);
       }
-    }, "JDK installation failed");
+    }, "Java installation failed");
   }
 
   static async install(ver: number, index?: number, total?: number) {
-    await mkdir(JDK.DIR, { recursive: true });
-    const dir = join(JDK.DIR, `jdk${ver}`);
+    await mkdir(Java.DIR, { recursive: true });
+    const dir = join(Java.DIR, `jdk${ver}`);
     if (await exists(join(dir, "bin", IS_WIN32 ? "java.exe" : "java"))) return;
 
-    log(`Installing JDK ${ver}...`, "info");
+    log(`Installing Java ${ver}...`, "info");
     await rm(dir, { recursive: true, force: true });
 
     const os = IS_WIN32 ? "windows" : "linux";
     const apiUrl = `https://api.adoptium.net/v3/assets/latest/${ver}/hotspot?os=${os}&arch=x64`;
 
     const prefix = index && total ? `[${index}/${total}]: ` : "";
-    const loaderText = `${color(prefix, "info")}Installing JDK ${ver}...`;
+    const loaderText = `${color(prefix, "info")}Installing Java ${ver}...`;
 
     const loader1 = UI.loader(loaderText);
     const res = await fetch(apiUrl);
@@ -108,7 +108,7 @@ export default class JDK {
 
     const asset = assets.find(a => a.binary.image_type === "jdk" && a.binary.architecture === "x64");
     if (!asset) {
-      throwErr(`No JDK ${ver} available for ${os}/x64`);
+      throwErr(`No Java ${ver} available for ${os}/x64`);
       return;
     }
 
@@ -135,17 +135,17 @@ export default class JDK {
     await rm(archivePath);
 
     const javaPath = join(tmpDir, "bin", IS_WIN32 ? "java.exe" : "java");
-    if (!(await exists(javaPath))) throwErr(`JDK ${ver} verification failed`);
+    if (!(await exists(javaPath))) throwErr(`Java ${ver} verification failed`);
     await run(`"${javaPath}" -version`, { inherit: true });
 
     await rm(dir, { recursive: true, force: true });
     await rename(tmpDir, dir);
-    log(`JDK ${ver} installed at ${dir}`, "success");
+    log(`Java ${ver} installed at ${dir}`, "success");
   }
 
   static getJavaPath(version: string) {
-    const javaVer = JDK.javaVersion(version);
-    return join(JDK.DIR, `jdk${javaVer}`, "bin", IS_WIN32 ? "java.exe" : "java");
+    const javaVer = Java.javaVersion(version);
+    return join(Java.DIR, `jdk${javaVer}`, "bin", IS_WIN32 ? "java.exe" : "java");
   }
 
   static versionGte(a: string, b: string) {
@@ -164,48 +164,48 @@ export default class JDK {
     if (!m) return false;
     const loader = m[1]!;
     const mcVer = m[2]!;
-    if (loader === "Forge" && JDK.versionGte(mcVer, "1.7.10") && !JDK.versionGte(mcVer, "1.13.3")) return true;
-    if (loader === "Fabric" && JDK.versionGte(mcVer, "1.14")) return true;
+    if (loader === "Forge" && Java.versionGte(mcVer, "1.7.10") && !Java.versionGte(mcVer, "1.13.3")) return true;
+    if (loader === "Fabric" && Java.versionGte(mcVer, "1.14")) return true;
     return false;
   }
 
   static toVersionOption(version: string): string | ListItem {
-    return JDK.isSupportedVersion(version) ? version : { label: version, badge: "Not Supported", badgeColor: "red", blocked: true };
+    return Java.isSupportedVersion(version) ? version : { label: version, badge: "Not Supported", badgeColor: "red", blocked: true };
   }
 
   private static javaVersion(mcVersion: string) {
-    if (JDK.versionGte(mcVersion, "26.1")) return 25;
-    if (JDK.versionGte(mcVersion, "1.20.5")) return 21;
-    if (JDK.versionGte(mcVersion, "1.18")) return 17;
-    if (JDK.versionGte(mcVersion, "1.17")) return 16;
+    if (Java.versionGte(mcVersion, "26.1")) return 25;
+    if (Java.versionGte(mcVersion, "1.20.5")) return 21;
+    if (Java.versionGte(mcVersion, "1.18")) return 17;
+    if (Java.versionGte(mcVersion, "1.17")) return 16;
     return 8;
   }
 
   static getRam() {
-    const partOfRam = Math.floor((totalmem() / 1024 / 1024) * JDK.MAX_RAM_PERCENTAGE);
+    const partOfRam = Math.floor((totalmem() / 1024 / 1024) * Java.MAX_RAM_PERCENTAGE);
 
-    JDK.ram = partOfRam > JDK.MAX_RAM_MB ? JDK.MAX_RAM_MB : partOfRam;
-    if (JDK.ram < JDK.MIN_RAM_MB) {
+    Java.ram = partOfRam > Java.MAX_RAM_MB ? Java.MAX_RAM_MB : partOfRam;
+    if (Java.ram < Java.MIN_RAM_MB) {
       throwErr("You don't have enough memory to play on the server :(");
     }
   }
 
   static async kill() {
     await tryCatch(async () => {
-      JDK.process?.kill();
+      Java.process?.kill();
       await new Promise<void>((resolve) => {
-        if (JDK.process) {
-          JDK.process.on("close", () => {
+        if (Java.process) {
+          Java.process.on("close", () => {
             return resolve();
           });
-          if (JDK.process.killed || JDK.process.exitCode !== null) {
+          if (Java.process.killed || Java.process.exitCode !== null) {
             resolve();
           }
         } else {
           resolve();
         }
       });
-    }, "JDK process was not killed", true);
+    }, "Java process was not killed", true);
   }
 
   private static readonly SERVER_PROPS = `
@@ -232,7 +232,7 @@ max-players=10
 network-compression-threshold=256
 resource-pack-sha1=
 max-world-size=29999984
-server-port=${JDK.PORT}
+server-port=${Java.PORT}
 server-ip=
 spawn-npcs=true
 allow-flight=true

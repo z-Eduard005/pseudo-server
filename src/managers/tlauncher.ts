@@ -2,7 +2,7 @@ import { readFile, writeFile, readdir, cp, rename, rm } from "fs/promises";
 import { exists, run, log, throwErr, tryCatch } from "../utils"
 import { join, extname } from "path";
 import { IS_WIN32, MC_DIR } from "../constants";
-import JDK from "./jdk";
+import Java from "./java";
 import UI from "./ui";
 import { spawn } from "child_process";
 
@@ -55,7 +55,7 @@ export default class Tlauncher {
   static async initSettings() {
     await tryCatch(async () => {
       const props = await readFile(Tlauncher.PROPS_FILE, "utf8");
-      const requiredProps = Tlauncher.REQUIRED_PROPS.map(p => p.replaceAll("_RAM_VALUE_", JDK.ram.toString()));
+      const requiredProps = Tlauncher.REQUIRED_PROPS.map(p => p.replaceAll("_RAM_VALUE_", Java.ram.toString()));
 
       await writeFile(Tlauncher.PROPS_FILE, Tlauncher.addProps(props, requiredProps), "utf8");
     }, `Error initializing tlauncher settings (check the destination folder - ${Tlauncher.PROPS_FILE})`);
