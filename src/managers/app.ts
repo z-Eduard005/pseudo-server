@@ -29,7 +29,7 @@ type GithubRelease = {
 export type Instance = {
   name: string;
   owner: string;
-  ready: boolean;
+  ready: "init" | "server-installed" | "done";
   version: string;
 }
 
@@ -42,7 +42,7 @@ export default class App {
   private static readonly SHORTCUT_FILE = join(APP_DIR, `${APP_NAME}.lnk`);
   private static readonly DESKTOP_ENTRY_PATH = join(USER_DIR, ".local", "share", "applications");
   private static readonly DESKTOP_ENTRY_FILE = join(App.DESKTOP_ENTRY_PATH, APP_NAME + ".desktop");
-  private static readonly PENDING_DIR = join(INSTANCES_DIR, "PENDING_DIR");
+  static readonly PENDING_DIR = join(INSTANCES_DIR, "PENDING_DIR");
 
   private static isNewerVersion(releaseTag: string): boolean {
     const [r0 = 0, r1 = 0, r2 = 0] = releaseTag.replace(/^v/, "").split(".").map(Number);
@@ -191,10 +191,9 @@ export default class App {
     await Tlauncher.setupServerVersion(serverVersion, serverName);
     await rename(App.PENDING_DIR, join(INSTANCES_DIR, serverName));
 
-    const version = serverVersion.match(/(\d+\.\d+(?:\.\d+)?)/)?.[0] ?? serverVersion;
     const config = await App.getConfig(CONFIG_FILE);
     const instances = (config["instances"] as Instance[]) ?? [];
-    instances.push({ name: serverName, owner: "me", ready: false, version });
+    instances.push({ name: serverName, owner: "me", ready: "init", version: serverVersion });
     await App.putConfig(CONFIG_FILE, { instances });
   }
 }

@@ -8,6 +8,7 @@ import Process from "./managers/process";
 import Hosting from "./managers/hosting";
 import App, { type Instance } from "./managers/app";
 import { CONFIG_FILE } from "./constants";
+import { basename } from "path";
 
 tryCatch(
   async () => {
@@ -100,7 +101,7 @@ tryCatch(
 
             const { value, cancelled, index } = await UI.list(versionItems, {
               title: `${color("[2/3]:", "info")} Server creation...`,
-              desc: "Choose Minecraft version (install from tlauncher):",
+              desc: "Choose Minecraft version (install from tlauncher):\n\nNot Supported:\n- regular versions\n- fabric below 1.14\n- forge above 1.13.2",
               refresh: () => getAvailableVersions(),
               action: {
                 label: "> Open TLauncher", run: () => {
@@ -117,6 +118,14 @@ tryCatch(
             serverVersionIndex = index;
             await App.initInstance(serverName, serverVersion);
 
+            await Java.downloadServerJar(serverVersion, serverName);
+            await Java.installServer(serverName);
+            const config = await App.getConfig(CONFIG_FILE);
+            const instances = (config["instances"] as Instance[]) ?? [];
+            const inst = instances.find(i => i.name === serverName);
+            if (inst) inst.ready = "server-installed";
+            await App.putConfig(CONFIG_FILE, { instances });
+
             step = 3;
           }
         }
@@ -127,13 +136,13 @@ tryCatch(
 
       if (value === "= Choose Server") {
         const config = await App.getConfig(CONFIG_FILE);
-        const instances = (config["instances"] as Instance[]) ?? [];
+        const instances = ((config["instances"] as Instance[]) ?? []).filter(i => i.name !== basename(App.PENDING_DIR));
         if (instances.length === 0) continue;
 
         const { value, cancelled } = await UI.list(
           instances.map(i => {
             const item: ListItem = { label: i.name };
-            if (!i.ready) {
+            if (i.ready !== "done") {
               item.badge = "Not Ready";
             } else if (i.owner === "me") {
               item.badge = "★";

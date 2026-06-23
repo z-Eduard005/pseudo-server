@@ -190,6 +190,52 @@ export default class Java {
     }
   }
 
+  static async downloadServerJar(version: string, serverName: string) {
+    return await tryCatch(async () => {
+      const m = version.match(/^(Fabric|Forge) (\d+\.\d+(?:\.\d+)?)$/);
+      const loader = m?.[1];
+      const mcVer = m?.[2];
+      const targetDir = join(INSTANCES_DIR, serverName, "server")
+
+      if (loader === "Fabric") {
+        throwErr("Fabric server jar download not implemented yet");
+        return;
+      }
+
+      if (loader === "Forge") {
+        log("Fetching Forge versions...", "info")
+        const spinner = UI.spinner();
+        const res = await fetch("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json");
+        const data = (await res.json()) as { promos: Record<string, string> };
+        spinner.stop();
+
+        let forgeVer = data.promos[`${mcVer}-recommended`];
+        if (!forgeVer) forgeVer = data.promos[`${mcVer}-latest`];
+        if (!forgeVer) throwErr(`No Forge version found for Minecraft ${mcVer}`);
+
+        const jarName = `forge-${mcVer}-${forgeVer}-installer.jar`;
+        const url = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcVer}-${forgeVer}/${jarName}`;
+
+        const loader = UI.loader(`Downloading ${jarName}...`);
+        const dl = await fetch(url);
+        await mkdir(targetDir, { recursive: true });
+        const jarPath = join(targetDir, jarName);
+        await writeFile(jarPath, Buffer.from(await dl.arrayBuffer()));
+        loader.stop();
+
+        const javaPath = Java.getJavaPath(mcVer!);
+        await run(`"${javaPath}" -jar "${jarPath}" --installServer`, { cwd: targetDir, inherit: true });
+
+        await rm(jarPath);
+      }
+      log("Server installed successfully", "success");
+    }, "Server jar installation failed");
+  }
+
+  static async installServer(serverName: string) {
+    console.log(serverName);
+  }
+
   static async kill() {
     await tryCatch(async () => {
       Java.process?.kill();
