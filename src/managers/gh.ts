@@ -10,7 +10,7 @@ export default class GH {
     return await isSuccess(async () => await run(IS_WIN32 ? `where ${pkg}` : `which ${pkg}`));
   };
 
-  static async installGit() {
+  static async install() {
     if (await GH.isInstalled("git") && await GH.isInstalled("gh")) return;
     log("Installing dependencies...", "info");
 

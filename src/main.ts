@@ -21,9 +21,9 @@ tryCatch(
           [{ label: "Zerotier Network ID", badge: "locked" }, { label: "test", badge: "locked" }],
           {
             title: "Settings",
-            desc: "Change theese on your own risk",
+            desc: "Change these on your own risk",
             lockable: true,
-            action: { label: "🔒︎ Unlock", run: () => { } }
+            action: { label: "▣ Unlock", run: () => { } }
           }
         );
         if (cancelled) return;
@@ -73,7 +73,7 @@ tryCatch(
             const existing = (config["instances"] as Instance[]) ?? [];
 
             const { value, cancelled } = await UI.input({
-              title: `${color("[1|3]:", "info")} Server creation...`,
+              title: `${color("[1/3]:", "info")} Server creation...`,
               filter: /[a-zA-Z_-]/,
               desc: "Type a name for your server instance:",
               defaultValue: serverName,
@@ -91,7 +91,7 @@ tryCatch(
           if (step === 2) {
             const versions = await Tlauncher.installedVersions();
             const { value, cancelled, index } = await UI.list(versions, {
-              title: `${color("[2|3]:", "info")} Server creation...`,
+              title: `${color("[2/3]:", "info")} Server creation...`,
               desc: "Choose Minecraft version (install from tlauncher):",
               refresh: Tlauncher.installedVersions,
               action: {
@@ -162,11 +162,11 @@ tryCatch(
 
     await Git.worldInit();
 
-    await JDK.generateServerSettings(Zerotier.ip!);
-    await JDK.start();
+    await JDK.generateServerSettings(Zerotier.ip!, "TEST");
+    await JDK.start("TEST");
 
     JDK.process?.on("error", async (err) => {
-      throwErr(`Error starting Java server. Check path to Java, it should be like this: ${JDK.FILE}\n${err}`);
+      throwErr(`Error starting Java server. Check path to Java: ${JDK.getJavaPath("TEST")}\n${err}`);
     });
     JDK.process?.on("close", async (code) => {
       if (code !== 0) {

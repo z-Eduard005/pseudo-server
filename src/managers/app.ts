@@ -16,6 +16,7 @@ import Tlauncher from "./tlauncher";
 import Process from "./process";
 import GH from "./gh";
 import UI from "./ui";
+import JDK from "./jdk";
 
 type GithubRelease = {
   tag_name: string;
@@ -32,7 +33,7 @@ export type Instance = {
 }
 
 export default class App {
-  private static readonly VERSION = "0.0.22";
+  private static readonly VERSION = "0.0.24";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(APP_DIR, IS_WIN32 ? APP_NAME + ".exe" : APP_NAME);
@@ -112,15 +113,12 @@ export default class App {
     const processPath = normalize(process.execPath).toLowerCase();
     const appFile = normalize(App.FILE).toLowerCase();
     if (processPath === appFile) return;
+    await rename(process.execPath, App.FILE);
 
-    if (IS_WIN32) {
-      if (await exists(App.FILE)) await rm(App.FILE, { force: true });
-      await rename(process.execPath, App.FILE);
-      log(`Please restart the app with the shortcut "${App.SHORTCUT_FILE}"`, "warning")
-    } else {
-      await rename(process.execPath, App.FILE);
-      log(`Please restart the app with the file "${App.DESKTOP_ENTRY_FILE}"`, "warning")
-    }
+    log(
+      `Please restart the app with the ${IS_WIN32 ? `shortcut "${App.SHORTCUT_FILE}"` : `file "${App.DESKTOP_ENTRY_FILE}"`}`,
+      "warning"
+    );
 
     await Process.stop();
   }
@@ -149,9 +147,8 @@ export default class App {
       spiner2.stop();
 
       await writeFile(`${App.FILE}.tmp`, buffer);
-      const oldFile = `${App.FILE}.old`;
-      if (await exists(oldFile)) await rm(oldFile, { force: true });
-      await rename(App.FILE, oldFile);
+      if (await exists(`${App.FILE}.old`)) await rm(`${App.FILE}.old`, { force: true });
+      await rename(App.FILE, `${App.FILE}.old`);
       await rename(`${App.FILE}.tmp`, App.FILE);
       if (!IS_WIN32) await run(`chmod +x ${App.FILE}`);
 
@@ -168,7 +165,8 @@ export default class App {
 
     await Tlauncher.install();
     await Tlauncher.initSettings();
-    await GH.installGit();
+    await JDK.installAll();
+    await GH.install();
     await Zerotier.install();
 
     const config = await App.getConfig(CONFIG_FILE);

@@ -1,22 +1,26 @@
 import { spawn } from "child_process";
 import type { ChildProcessByStdio } from "child_process";
 import { Stream } from "stream";
-import { exists, retryRun, run, log, sudo, throwErr, tryCatch } from "../utils";
+import { exists, run, log, throwErr, tryCatch, color } from "../utils";
 import { join } from "path";
-import { IS_WIN32, APP_NAME, APP_DIR } from "../constants";
-import { writeFile } from "fs/promises";
+import { IS_WIN32, APP_NAME, APP_DIR, INSTANCES_DIR } from "../constants";
+import { mkdir, rename, rm, writeFile } from "fs/promises";
 import { totalmem } from "os";
+import UI from "./ui";
+
+type AdoptiumAsset = {
+  binary: {
+    image_type: string;
+    architecture: string;
+    package: {
+      link: string;
+      name: string;
+    };
+  };
+};
 
 export default class JDK {
-  private static readonly FORGE_FILE = join(APP_DIR, "forge-1.12.2-14.23.5.2860.jar");
-  private static readonly PATH = join("/opt", "jdk8u292-b10")
-  private static readonly DOWNLOAD_URL =
-    "https://github.com/AdoptOpenJDK/openjdk8-binaries/releases/download/jdk8u292-b10/OpenJDK8U-jdk_x64_linux_hotspot_8u292b10.tar.gz";
-  private static readonly DOWNLOAD_FILENAME = "jdk8u292-b10.tar.gz";
-  private static readonly SERVER_PROPS_FILE = join(APP_DIR, "server.properties");
-  static readonly FILE = IS_WIN32
-    ? join("C:", "Program Files", "AdoptOpenJDK", "jdk-8.0.292.10-hotspot", "bin", "java.exe")
-    : join(JDK.PATH, "bin", "java");
+  static readonly DIR = join(APP_DIR, "jdk");
 
   private static readonly MIN_RAM_MB = 2700;
   private static readonly MAX_RAM_MB = 7168;
@@ -25,16 +29,16 @@ export default class JDK {
   static ram = JDK.MIN_RAM_MB;
   static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 
-  static async start() {
+  static async start(serverName: string) {
     log("Server is loading...", "info");
     JDK.process = await tryCatch(() => {
       return spawn(
-        JDK.FILE,
+        "JDK.FILE",
         [
           `-Xmx${JDK.ram}M`,
           `-Xms${JDK.ram}M`,
           "-jar",
-          JDK.FORGE_FILE,
+          join(INSTANCES_DIR, serverName, "server", "server.jar (more letters i guess)"),
           "nogui",
         ],
         {
@@ -53,39 +57,107 @@ export default class JDK {
     }
   }
 
-  static async linuxInstall() {
-    if (await exists(JDK.PATH)) {
-      return;
-    }
-    log("Installing necessary Java...", "info");
-
-    await tryCatch(async () => {
-      await run(sudo(`mkdir -p ${JDK.PATH}`), { inherit: true });
-      await retryRun(() => {
-        return run(
-          [
-            sudo(`curl -fsSL -o ${JDK.DOWNLOAD_FILENAME} ${JDK.DOWNLOAD_URL}`),
-            sudo(`tar -xzf ${JDK.DOWNLOAD_FILENAME} --strip-components=1`),
-            sudo(`rm ${JDK.DOWNLOAD_FILENAME}`),
-          ],
-          { inherit: true, cwd: JDK.PATH }
-        );
-      });
-    }, "Required java is not installed");
-  }
-
-  static async generateServerSettings(ip: string) {
+  static async generateServerSettings(ip: string, serverName: string) {
     log("Generating server settings...", "info");
     await tryCatch(
       () => {
         return writeFile(
-          JDK.SERVER_PROPS_FILE,
+          join(INSTANCES_DIR, serverName, "server", "server.properties"),
           JDK.SERVER_PROPS.replace("server-ip=", "server-ip=" + ip),
           "utf8"
         );
       },
       "Error creating server configuration files"
     );
+  }
+
+  static async installAll() {
+    await tryCatch(async () => {
+      const versions = [25, 21, 17, 16, 8];
+      for (let i = 0; i < versions.length; i++) {
+        await JDK.install(versions[i]!, i + 1, versions.length);
+      }
+    }, "JDK installation failed");
+  }
+
+  static async install(ver: number, index?: number, total?: number) {
+    await mkdir(JDK.DIR, { recursive: true });
+    const dir = join(JDK.DIR, `jdk${ver}`);
+    if (await exists(join(dir, "bin", IS_WIN32 ? "java.exe" : "java"))) return;
+
+    log(`Installing JDK ${ver}...`, "info");
+    await rm(dir, { recursive: true, force: true });
+
+    const os = IS_WIN32 ? "windows" : "linux";
+    const apiUrl = `https://api.adoptium.net/v3/assets/latest/${ver}/hotspot?os=${os}&arch=x64`;
+
+    const prefix = index && total ? `[${index}/${total}]: ` : "";
+    const loaderText = `${color(prefix, "info")}Installing JDK ${ver}...`;
+
+    const loader1 = UI.loader(loaderText);
+    const res = await fetch(apiUrl);
+    const assets = (await res.json()) as AdoptiumAsset[];
+    loader1.stop();
+
+    const asset = assets.find(a => a.binary.image_type === "jdk" && a.binary.architecture === "x64");
+    if (!asset) {
+      throwErr(`No JDK ${ver} available for ${os}/x64`);
+      return;
+    }
+
+    const downloadUrl = asset.binary.package.link;
+    const archiveName = asset.binary.package.name;
+
+    const tmpDir = dir + ".tmp";
+    await rm(tmpDir, { recursive: true, force: true });
+    await mkdir(tmpDir, { recursive: true });
+
+    const loader2 = UI.loader(loaderText);
+    const dl = await fetch(downloadUrl);
+    const archivePath = join(tmpDir, archiveName);
+    await writeFile(archivePath, Buffer.from(await dl.arrayBuffer()));
+    loader2.stop();
+
+    await run(
+      IS_WIN32
+        ? `tar -xf "${archiveName}" --strip-components=1`
+        : `tar -xzf "${archiveName}" --strip-components=1`,
+      { cwd: tmpDir, inherit: true }
+    );
+
+    await rm(archivePath);
+
+    const javaPath = join(tmpDir, "bin", IS_WIN32 ? "java.exe" : "java");
+    if (!(await exists(javaPath))) throwErr(`JDK ${ver} verification failed`);
+    await run(`"${javaPath}" -version`, { inherit: true });
+
+    await rm(dir, { recursive: true, force: true });
+    await rename(tmpDir, dir);
+    log(`JDK ${ver} installed at ${dir}`, "success");
+  }
+
+  static getJavaPath(version: string) {
+    const javaVer = JDK.javaVersion(version);
+    return join(JDK.DIR, `jdk${javaVer}`, "bin", IS_WIN32 ? "java.exe" : "java");
+  }
+
+  private static versionGte(a: string, b: string) {
+    const ap = a.split(".").map(Number);
+    const bp = b.split(".").map(Number);
+    for (let i = 0; i < Math.max(ap.length, bp.length); i++) {
+      const an = ap[i] ?? 0;
+      const bn = bp[i] ?? 0;
+      if (an !== bn) return an > bn;
+    }
+    return true;
+  }
+
+  private static javaVersion(mcVersion: string) {
+    if (JDK.versionGte(mcVersion, "26.1")) return 25;
+    if (JDK.versionGte(mcVersion, "1.20.5")) return 21;
+    if (JDK.versionGte(mcVersion, "1.18")) return 17;
+    if (JDK.versionGte(mcVersion, "1.17")) return 16;
+    return 8;
   }
 
   static getRam() {
