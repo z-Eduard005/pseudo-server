@@ -9,14 +9,13 @@ export const run: Run = async (commands, options) => {
   const result: string[] = [],
     commandsArray: string[] = Array.isArray(commands) ? commands : [commands],
     spawnFn = (c: string) => {
+      const isTTY = options?.inherit && process.stdin.isTTY;
       const child = spawn(c, {
         shell: IS_WIN32 ? true : LINUX_SHELL,
         cwd: options?.cwd,
-        env: process.env
-      });
-      if (options?.inherit && process.stdin.isTTY) {
-        process.stdin.pipe(child.stdin);
-      }
+        env: process.env,
+        ...(isTTY ? { stdio: ['inherit', 'pipe', 'pipe'] as const } : {})
+      }) as ChildProcessWithoutNullStreams;
       return child;
     };
 
@@ -48,9 +47,6 @@ export const run: Run = async (commands, options) => {
         });
 
         child.on("close", (code) => {
-          if (options?.inherit && process.stdin.isTTY) {
-            process.stdin.unpipe(child.stdin);
-          }
           return code === 0
             ? resolve(stdout.trim())
             : reject(

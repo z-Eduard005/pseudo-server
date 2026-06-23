@@ -73,9 +73,16 @@ export default class JDK {
 
   static async installAll() {
     await tryCatch(async () => {
-      const versions = [25, 21, 17, 16, 8];
-      for (let i = 0; i < versions.length; i++) {
-        await JDK.install(versions[i]!, i + 1, versions.length);
+      const allVersions = [25, 21, 17, 16, 8];
+      const toInstall: number[] = [];
+      for (const ver of allVersions) {
+        const dir = join(JDK.DIR, `jdk${ver}`);
+        if (!await exists(join(dir, "bin", IS_WIN32 ? "java.exe" : "java"))) {
+          toInstall.push(ver);
+        }
+      }
+      for (let i = 0; i < toInstall.length; i++) {
+        await JDK.install(toInstall[i]!, i + 1, toInstall.length);
       }
     }, "JDK installation failed");
   }

@@ -110,8 +110,7 @@ export default class UI {
         "╚" + "═".repeat(W) + "╝",
       ].map(l => indent + l).join("\n");
       if (text) {
-        const tIndent = " ".repeat(Math.max(0, Math.floor((UI.cols() - text.length) / 2)));
-        return `\x1B[1m${tIndent}${text}\x1B[22m\n\n${box}`;
+        return `${indent}\x1B[1m${text}\x1B[22m\n\n${box}`;
       }
       return box;
     };

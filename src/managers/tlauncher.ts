@@ -116,8 +116,8 @@ export default class Tlauncher {
 
     if (IS_WIN32) log("\nPlease restart, after tlauncher installed", "success");
     await tryCatch(
-      () => {
-        return run(
+      async () => {
+        return await run(
           IS_WIN32 ? `start "" ${Tlauncher.INSTALLER_URL}` : Tlauncher.FEDORA_MC_INSTALLER,
           { inherit: true }
         );
@@ -128,10 +128,10 @@ export default class Tlauncher {
     throwErr();
   }
 
-  static async installedVersions(): Promise<string[]> {
+  static async installedVersions(excludeNames: string[] = []): Promise<string[]> {
     return await tryCatch(async () => {
       const entries = await readdir(Tlauncher.VERSIONS_DIR, { withFileTypes: true });
-      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).filter(d => !excludeNames.includes(d));
       const hasJar = await Promise.all(dirs.map(d => exists(join(Tlauncher.VERSIONS_DIR, d, `${d}.jar`))));
       return dirs.filter((_, i) => hasJar[i]).sort();
     }, "Failed to read installed versions");

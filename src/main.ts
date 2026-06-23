@@ -18,12 +18,15 @@ tryCatch(
     const settingsAction = async () => {
       while (true) {
         const { value, cancelled } = await UI.list(
-          [{ label: "Zerotier Network ID", badge: "locked", blocked: true }, { label: "test", badge: "locked", blocked: true }],
+          [
+            { label: "Zerotier Network ID", badge: "locked", blocked: true },
+            { label: "test", badge: "locked", blocked: true }
+          ],
           {
             title: "Settings",
             desc: "Change these on your own risk",
             lockable: true,
-            action: { label: "▣ Unlock", run: () => { } }
+            action: { label: "□ Unlock", run: () => { } }
           }
         );
         if (cancelled) return;
@@ -66,11 +69,12 @@ tryCatch(
         let serverVersion = "";
         let serverVersionIndex = -1;
         let step = 1;
+        let existing: Instance[] = [];
 
         while (step > 0 && step < 3) {
           if (step === 1) {
             const config = await App.getConfig(CONFIG_FILE);
-            const existing = (config["instances"] as Instance[]) ?? [];
+            existing = (config["instances"] as Instance[]) ?? [];
 
             const { value, cancelled } = await UI.input({
               title: `${color("[1/3]:", "info")} Server creation...`,
@@ -89,11 +93,15 @@ tryCatch(
             step = 2;
           }
           if (step === 2) {
-            const versionItems = (await Tlauncher.installedVersions()).map(JDK.toVersionOption);
+            const getAvailableVersions = async () => {
+              return (await Tlauncher.installedVersions(existing.map(i => i.name))).map(JDK.toVersionOption)
+            }
+            const versionItems = await getAvailableVersions();
+
             const { value, cancelled, index } = await UI.list(versionItems, {
               title: `${color("[2/3]:", "info")} Server creation...`,
               desc: "Choose Minecraft version (install from tlauncher):",
-              refresh: async () => (await Tlauncher.installedVersions()).map(JDK.toVersionOption),
+              refresh: () => getAvailableVersions(),
               action: {
                 label: "> Open TLauncher", run: () => {
                   if (Date.now() - lastTlauncherLaunch < 5000) return;
