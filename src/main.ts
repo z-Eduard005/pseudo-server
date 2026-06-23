@@ -18,7 +18,7 @@ tryCatch(
     const settingsAction = async () => {
       while (true) {
         const { value, cancelled } = await UI.list(
-          [{ label: "Zerotier Network ID", badge: "locked" }, { label: "test", badge: "locked" }],
+          [{ label: "Zerotier Network ID", badge: "locked", blocked: true }, { label: "test", badge: "locked", blocked: true }],
           {
             title: "Settings",
             desc: "Change these on your own risk",
@@ -89,11 +89,11 @@ tryCatch(
             step = 2;
           }
           if (step === 2) {
-            const versions = await Tlauncher.installedVersions();
-            const { value, cancelled, index } = await UI.list(versions, {
+            const versionItems = (await Tlauncher.installedVersions()).map(JDK.toVersionOption);
+            const { value, cancelled, index } = await UI.list(versionItems, {
               title: `${color("[2/3]:", "info")} Server creation...`,
               desc: "Choose Minecraft version (install from tlauncher):",
-              refresh: Tlauncher.installedVersions,
+              refresh: async () => (await Tlauncher.installedVersions()).map(JDK.toVersionOption),
               action: {
                 label: "> Open TLauncher", run: () => {
                   if (Date.now() - lastTlauncherLaunch < 5000) return;

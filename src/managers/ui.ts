@@ -13,7 +13,7 @@ type InputOptions = LayoutOptions & {
 }
 
 type ListOptions = LayoutOptions & {
-  refresh?: () => Promise<string[]>;
+  refresh?: () => Promise<(string | ListItem)[]>;
   defaultValue?: number;
   lockable?: boolean;
   footerText?: string;
@@ -23,6 +23,7 @@ export type ListItem = {
   label: string;
   badge?: string;
   badgeColor?: "red" | "green" | "yellow";
+  blocked?: boolean;
 }
 
 type Render = (
@@ -326,7 +327,8 @@ export default class UI {
 
             const plain = l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
             const BADGE_STYLE = item.badgeColor === "green" ? "\x1B[32m\x1B[1m" : item.badgeColor === "yellow" ? "\x1B[33m\x1B[1m" : "\x1B[48;5;196m\x1B[38;5;255m";
-            const truncatedBadge = item.badge && item.badge.length > 10 ? item.badge.slice(0, 10) + "..." : item.badge;
+            const displayBadge = item.badge || (item.blocked ? "locked" : undefined);
+            const truncatedBadge = displayBadge && displayBadge.length > 10 ? displayBadge.slice(0, 10) + "..." : displayBadge;
             const badgeText = truncatedBadge && i === 0 ? ` ${BADGE_STYLE}${truncatedBadge}${bg}${fg}` : "";
             const rightFill = Math.max(0, LIST_WIDTH - UI.PADDING - plain.length - scrollBarWidth - (truncatedBadge && i === 0 ? truncatedBadge.length + 1 : 0));
             const style = i === 0 ? "\x1B[1m" : "";
@@ -381,10 +383,11 @@ export default class UI {
           if (key === "\u000f") {
             const item = pool[selectedIndex];
             if (item) {
-              if (item.badge === "locked") {
+              if (item.blocked) {
+                delete item.blocked;
                 delete item.badge;
               } else {
-                item.badge = "locked";
+                item.blocked = true;
               }
               rerender();
             }
@@ -392,11 +395,12 @@ export default class UI {
           }
           if (key === "\r" || key === "\r\n") {
             if (pool.length === 0) return;
-            if (pool[selectedIndex]?.badge === "locked") return;
+            if (pool[selectedIndex]?.blocked) return;
           }
         }
         if (key === "\r" || key === "\r\n") {
           if (pool.length === 0) return;
+          if (pool[selectedIndex]?.blocked) return;
           cleanup();
           resolve({ value: pool[selectedIndex]!.label, index: selectedIndex, cancelled: false });
           return;

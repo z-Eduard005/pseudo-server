@@ -6,7 +6,7 @@ import { join } from "path";
 import { IS_WIN32, APP_NAME, APP_DIR, INSTANCES_DIR } from "../constants";
 import { mkdir, rename, rm, writeFile } from "fs/promises";
 import { totalmem } from "os";
-import UI from "./ui";
+import UI, { type ListItem } from "./ui";
 
 type AdoptiumAsset = {
   binary: {
@@ -141,7 +141,7 @@ export default class JDK {
     return join(JDK.DIR, `jdk${javaVer}`, "bin", IS_WIN32 ? "java.exe" : "java");
   }
 
-  private static versionGte(a: string, b: string) {
+  static versionGte(a: string, b: string) {
     const ap = a.split(".").map(Number);
     const bp = b.split(".").map(Number);
     for (let i = 0; i < Math.max(ap.length, bp.length); i++) {
@@ -150,6 +150,20 @@ export default class JDK {
       if (an !== bn) return an > bn;
     }
     return true;
+  }
+
+  private static isSupportedVersion(version: string) {
+    const m = version.match(/^(Fabric|Forge) (\d+\.\d+(?:\.\d+)?)$/);
+    if (!m) return false;
+    const loader = m[1]!;
+    const mcVer = m[2]!;
+    if (loader === "Forge" && JDK.versionGte(mcVer, "1.7.10") && !JDK.versionGte(mcVer, "1.13.3")) return true;
+    if (loader === "Fabric" && JDK.versionGte(mcVer, "1.14")) return true;
+    return false;
+  }
+
+  static toVersionOption(version: string): string | ListItem {
+    return JDK.isSupportedVersion(version) ? version : { label: version, badge: "Not Supported", badgeColor: "red", blocked: true };
   }
 
   private static javaVersion(mcVersion: string) {
