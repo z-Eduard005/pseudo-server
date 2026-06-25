@@ -4,7 +4,7 @@ import { Stream } from "stream";
 import { exists, run, log, throwErr, tryCatch, color } from "../utils";
 import { join } from "path";
 import { IS_WIN32, APP_NAME, APP_DIR, INSTANCES_DIR } from "../constants";
-import { mkdir, rename, rm, writeFile } from "fs/promises";
+import { mkdir, rename, rm, writeFile, readFile } from "fs/promises";
 import { totalmem } from "os";
 import UI, { type ListItem } from "./ui";
 
@@ -25,7 +25,7 @@ export default class Java {
   private static readonly MIN_RAM_MB = 2700;
   private static readonly MAX_RAM_MB = 7168;
   private static readonly MAX_RAM_PERCENTAGE = 0.4;
-  static readonly PORT = "42069";
+  static readonly PORT = "67676";
   static ram = Java.MIN_RAM_MB;
   static process: ChildProcessByStdio<Stream.Writable, Stream.Readable, null> | null = null;
 
@@ -190,16 +190,20 @@ export default class Java {
     }
   }
 
-  static async downloadServerJar(version: string, serverName: string) {
+  static async installServer(name: string, version: string) {
     return await tryCatch(async () => {
       const m = version.match(/^(Fabric|Forge) (\d+\.\d+(?:\.\d+)?)$/);
       const loader = m?.[1];
       const mcVer = m?.[2];
-      const targetDir = join(INSTANCES_DIR, serverName, "server")
+      const serverDir = join(INSTANCES_DIR, name, "server");
+      const javaPath = Java.getJavaPath(mcVer!);
+      let jarName = "";
+
+      await rm(serverDir, { recursive: true, force: true });
+      await mkdir(serverDir, { recursive: true });
 
       if (loader === "Fabric") {
         throwErr("Fabric server jar download not implemented yet");
-        return;
       }
 
       if (loader === "Forge") {
@@ -213,27 +217,26 @@ export default class Java {
         if (!forgeVer) forgeVer = data.promos[`${mcVer}-latest`];
         if (!forgeVer) throwErr(`No Forge version found for Minecraft ${mcVer}`);
 
-        const jarName = `forge-${mcVer}-${forgeVer}-installer.jar`;
-        const url = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcVer}-${forgeVer}/${jarName}`;
+        jarName = `forge-${mcVer}-${forgeVer}.jar`;
+        const jarInstallerName = `forge-${mcVer}-${forgeVer}-installer.jar`;
+        const url = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcVer}-${forgeVer}/${jarInstallerName}`;
 
-        const loader = UI.loader(`Downloading ${jarName}...`);
+        const loader = UI.loader(`Downloading ${jarInstallerName}...`);
         const dl = await fetch(url);
-        await mkdir(targetDir, { recursive: true });
-        const jarPath = join(targetDir, jarName);
-        await writeFile(jarPath, Buffer.from(await dl.arrayBuffer()));
+        const jarInstallerPath = join(serverDir, jarInstallerName);
+        await writeFile(jarInstallerPath, Buffer.from(await dl.arrayBuffer()));
         loader.stop();
 
-        const javaPath = Java.getJavaPath(mcVer!);
-        await run(`"${javaPath}" -jar "${jarPath}" --installServer`, { cwd: targetDir, inherit: true });
-
-        await rm(jarPath);
+        await run(`"${javaPath}" -jar "${jarInstallerPath}" --installServer`, { cwd: serverDir, inherit: true });
+        await rm(jarInstallerPath);
       }
+
+      await run(`"${javaPath}" -jar "${jarName}"`, { cwd: serverDir, inherit: true });
+      const eulaPath = join(serverDir, "eula.txt");
+      await writeFile(eulaPath, (await readFile(eulaPath, "utf8")).replace("eula=false", "eula=true"));
+
       log("Server installed successfully", "success");
     }, "Server jar installation failed");
-  }
-
-  static async installServer(serverName: string) {
-    console.log(serverName);
   }
 
   static async kill() {

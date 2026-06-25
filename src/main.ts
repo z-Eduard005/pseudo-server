@@ -54,7 +54,6 @@ tryCatch(
         "+ Add New Server (Connect)",
       ], {
         title: UI.START_ART,
-        desc: "Choose an option:",
         backText: "Exit",
         defaultValue: mainOptionIndex,
         action: { label: "⛭ Settings", run: settingsAction },
@@ -80,7 +79,7 @@ tryCatch(
             const { value, cancelled } = await UI.input({
               title: `${color("[1/3]:", "info")} Server creation...`,
               filter: /[a-zA-Z_-]/,
-              desc: "Type a name for your server instance:",
+              desc: "Type a name for your server instance",
               defaultValue: serverName,
               validate: (name) => {
                 if (name.length > 20) return "Server name too long (max 20)";
@@ -101,7 +100,7 @@ tryCatch(
 
             const { value, cancelled, index } = await UI.list(versionItems, {
               title: `${color("[2/3]:", "info")} Server creation...`,
-              desc: "Choose Minecraft version (install from tlauncher):\n\nNot Supported:\n- regular versions\n- fabric below 1.14\n- forge above 1.13.2",
+              desc: "Choose Minecraft version (install from tlauncher)\n\nNot Supported:\n- fabric below 1.14\n- forge above 1.13.2",
               refresh: () => getAvailableVersions(),
               action: {
                 label: "> Open TLauncher", run: () => {
@@ -117,13 +116,12 @@ tryCatch(
             serverVersion = value;
             serverVersionIndex = index;
             await App.initInstance(serverName, serverVersion);
+            await Java.installServer(serverName, serverVersion);
 
-            await Java.downloadServerJar(serverVersion, serverName);
-            await Java.installServer(serverName);
             const config = await App.getConfig(CONFIG_FILE);
             const instances = (config["instances"] as Instance[]) ?? [];
             const inst = instances.find(i => i.name === serverName);
-            if (inst) inst.ready = "server-installed";
+            if (inst) inst.ready = "installed";
             await App.putConfig(CONFIG_FILE, { instances });
 
             step = 3;
@@ -153,7 +151,7 @@ tryCatch(
             }
             return item;
           }),
-          { title: "Choose Server", desc: "Select an instance to play on:" }
+          { title: "Choose Server", desc: "Select an instance to play on" }
         );
         console.log(value);
 

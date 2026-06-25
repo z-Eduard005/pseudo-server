@@ -29,7 +29,7 @@ type GithubRelease = {
 export type Instance = {
   name: string;
   owner: string;
-  ready: "init" | "server-installed" | "done";
+  ready: "init" | "installed" | "done";
   version: string;
 }
 
