@@ -138,6 +138,8 @@ tryCatch(
               validate: (p) => p && !existsSync(p) ? "Path does not exist" : null,
             });
 
+            await Git.initWorld(serverName);
+
             const config = await App.getConfig(CONFIG_FILE);
             const instances = (config["instances"] as Instance[]) ?? [];
             const inst = instances.find(i => i.name === serverName);

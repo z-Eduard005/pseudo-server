@@ -35,7 +35,7 @@ export type Instance = {
 }
 
 export default class App {
-  private static readonly VERSION = "0.0.25";
+  private static readonly VERSION = "0.0.26";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(APP_DIR, IS_WIN32 ? APP_NAME + ".exe" : APP_NAME);

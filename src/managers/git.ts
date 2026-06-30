@@ -15,6 +15,7 @@ export default class Git {
   static async initServer(serverName: string) {
     const serverDir = join(INSTANCES_DIR, serverName, "server");
     const deployKeyPath = join(INSTANCES_DIR, serverName, "deploy_key");
+    const posixPath = deployKeyPath.replace(/\\/g, "/");
 
     await tryCatch(async () => {
       // 0: remove previous failures
@@ -27,23 +28,23 @@ export default class Git {
       // Generate SSH deploy key pair
       await rm(deployKeyPath, { force: true });
       await rm(deployKeyPath + ".pub", { force: true });
-      await run(`ssh-keygen -t ed25519 -N "" -f "${deployKeyPath}"`);
+      await run(`ssh-keygen -t ed25519 -N "" -f "${posixPath}"`);
 
       // 3: create repo with gh and save to config
       const repoUrl = await GH.repoCreate(serverName);
       const pubKey = await readFile(deployKeyPath + ".pub", "utf8");
       await GH.addDeployKey(serverName, pubKey.trim());
 
-      // Set up remote + SSH config + commit init
+      // Set up remote + commit init
       await run(
         [
           `git remote add origin ${repoUrl}`,
-          `git config core.sshCommand "ssh -i ${deployKeyPath}"`,
           "git add -A",
           'git commit -m "init"'
         ],
         { cwd: serverDir }
       );
+      process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
       await run("git push --force origin server", { cwd: serverDir, inherit: true });
 
       // Save repoUrl to instance config
@@ -136,6 +137,8 @@ export default class Git {
   static async serverFetch(repoUrl: string, deployKeyPath: string) {
     log("Server synchronization...", "info");
     await tryCatch(async () => {
+      const posixPath = deployKeyPath.replace(/\\/g, "/");
+      process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
       if (!(await exists(Git.SERVER_DIR))) {
         // TODO
       }
@@ -150,10 +153,11 @@ export default class Git {
   }
 
   static async serverPush(_repoUrl: string, deployKeyPath: string) {
+    const posixPath = deployKeyPath.replace(/\\/g, "/");
     await tryCatch(async () => {
+      process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
       await run(
         [
-          `git config core.sshCommand "ssh -i ${deployKeyPath}"`,
           "git add -A",
           'git commit --amend -m "snapshot"',
           "git push --force origin server",
