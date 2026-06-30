@@ -1,8 +1,9 @@
 const fs = require("fs");
 const readline = require("readline");
 
-const file = "src/managers/app.ts";
-const content = fs.readFileSync(file, "utf8");
+const APP_FILE = "src/managers/app.ts";
+const PKG_FILE = "package.json";
+const content = fs.readFileSync(APP_FILE, "utf8");
 const match = content.match(
   /private static readonly VERSION = "(\d+\.\d+\.\d+)"/,
 );
@@ -30,7 +31,12 @@ rl.question(`Current version: ${current}\nNew version: `, (input) => {
     /private static readonly VERSION = "\d+\.\d+\.\d+"/,
     `private static readonly VERSION = "${trimmed}"`,
   );
-  fs.writeFileSync(file, newContent);
+  fs.writeFileSync(APP_FILE, newContent);
+
+  const pkg = JSON.parse(fs.readFileSync(PKG_FILE, "utf8"));
+  pkg.version = trimmed;
+  fs.writeFileSync(PKG_FILE, JSON.stringify(pkg, null, 2) + "\n");
+
   console.log(`Bumped to ${trimmed}`);
   rl.close();
 });

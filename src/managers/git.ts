@@ -1,42 +1,64 @@
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, rm, writeFile } from "fs/promises";
 import { exists, randomNum, run, log, tryCatch } from "../utils";
 import { USER_NAME, INSTANCES_DIR } from "../constants";
 import { join } from "path";
 
-const serverName = "TEST"
-
 export default class Git {
   private static readonly PUSH_INTERVAL_MS = 30 * 60 * 1000;
-  private static readonly SERVER_DIR = join(INSTANCES_DIR, serverName, "server");
-  private static readonly WORLD_DIR = join(Git.SERVER_DIR, "world");
   private static readonly REPO_URL = "TEST"
 
   static worldInitialized = false;
   static nodeWorldPushInterval: NodeJS.Timeout;
 
-  // ───────── World methods ─────────
+  static async initServer(serverName: string) {
+    const serverDir = join(INSTANCES_DIR, serverName, "server");
 
-  static async worldInit() {
     await tryCatch(async () => {
-      await writeFile(join(Git.SERVER_DIR, ".gitignore"), "/world/\n",);
+      // 0: remove previous failures
+      await rm(join(serverDir, ".git"), { recursive: true, force: true });
+      // 1: add to gitignore
+      await writeFile(join(serverDir, ".gitignore"), "/world/\n",);
+      // 2: git init for server dir on branch "server" 
+      // TODO 
+      // 3: create repo with gh for server dir and save token to config
+      // TODO
+      // 4: push server dir with token
+      // TODO
 
-      if (await exists(Git.WORLD_DIR)) {
-        await Git.worldSync();
-      } else {
-        log("World initialization...", "info");
-        await mkdir(Git.WORLD_DIR, { recursive: true });
-        await run(
-          [
-            "git init -b world",
-            "git config --add safe.directory .",
-            `git -c credential.helper= fetch --depth 1 ${Git.REPO_URL} world`,
-            "git reset --hard FETCH_HEAD",
-          ],
-          { inherit: true, cwd: Git.WORLD_DIR }
-        );
-      }
-      Git.worldInitialized = true;
-    }, "Error during Minecraft world initialization");
+    }, "Error during server directory initialization");
+  }
+
+  static async initWorld(serverName: string) {
+    const serverDir = join(INSTANCES_DIR, serverName, "server");
+    const worldDir = join(serverDir, "world");
+
+    await tryCatch(async () => {
+      // 0: remove previous failures
+      await rm(join(worldDir, ".git"), { recursive: true, force: true });
+      // 2: git init for world dir on branch "world" 
+      // TODO 
+      // 3: create repo with gh for world dir and save token to config
+      // TODO
+      // 4: push world dir with token
+      // TODO
+
+
+
+
+      // BACKUP: DONT DELETE
+      // log("World initialization...", "info");
+      // await mkdir(worldDir, { recursive: true });
+      // await run(
+      //   [
+      //     "git init -b world",
+      //     "git config --add safe.directory .",
+      //     `git -c credential.helper= fetch --depth 1 ${Git.REPO_URL} world`,
+      //     "git reset --hard FETCH_HEAD",
+      //   ],
+      //   { inherit: true, cwd: worldDir }
+      // );
+      // Git.worldInitialized = true;
+    }, "Error during world directory initialization");
   }
 
   static worldEnableRepeatedPush() {
@@ -83,8 +105,6 @@ export default class Git {
       }
     }, "Failed world synchronization");
   };
-
-  // ───────── Server methods ─────────
 
   private static async serverDirSetup(repoUrl: string, deployKeyPath: string) {
     await run(

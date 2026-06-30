@@ -10,6 +10,7 @@ type InputOptions = LayoutOptions & {
   maxLen?: number;
   filter?: RegExp;
   validate?: (value: string) => string | null;
+  allowEmpty?: boolean;
 }
 
 type ListOptions = LayoutOptions & {
@@ -437,7 +438,7 @@ export default class UI {
   }
 
   static input(layoutOptions?: InputOptions): Promise<{ value: string; cancelled: boolean }> {
-    const { defaultValue, maxLen, filter, validate } = layoutOptions ?? {};
+    const { defaultValue, maxLen, filter, validate, allowEmpty } = layoutOptions ?? {};
     return new Promise((resolve) => {
       let value = defaultValue ?? "";
       let cursorPos = value.length;
@@ -448,7 +449,7 @@ export default class UI {
       const CURSOR_BG = "\x1B[48;5;27m";
 
       const getError = (): string | null => {
-        if (value.length <= 3) return "Must be more than 3 symbols";
+        if (!allowEmpty && value.length <= 3) return "Must be more than 3 symbols";
         if (validate) return validate(value);
         return null;
       };

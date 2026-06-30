@@ -164,7 +164,7 @@ export default class Tlauncher {
       for (const key of ["id", "jar", "family"]) {
         if (json[key] !== undefined) json[key] = serverName;
       }
-      await writeFile(jsonFile, JSON.stringify(json), "utf8");
+      await writeFile(jsonFile, JSON.stringify(json, null, 2), "utf8");
     }, `Failed to setup server version for "${serverName}"`);
     loader.stop();
   }

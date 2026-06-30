@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import { log, tryCatch, throwErr, color } from "./utils";
 import UI, { type ListItem } from "./managers/ui";
 import Zerotier from "./managers/zerotier";
@@ -71,7 +72,7 @@ tryCatch(
         let step = 1;
         let existing: Instance[] = [];
 
-        while (step > 0 && step < 3) {
+        while (step > 0 && step < 4) {
           if (step === 1) {
             const config = await App.getConfig(CONFIG_FILE);
             existing = (config["instances"] as Instance[]) ?? [];
@@ -112,9 +113,9 @@ tryCatch(
               defaultValue: serverVersionIndex
             });
 
-            if (cancelled) { serverVersionIndex = index; step = 1; continue; }
-            serverVersion = value;
             serverVersionIndex = index;
+            if (cancelled) { step = 1; continue; }
+            serverVersion = value;
             await App.initInstance(serverName, serverVersion);
             await Java.installServer(serverName, serverVersion);
 
@@ -126,15 +127,35 @@ tryCatch(
 
             step = 3;
           }
+          if (step === 3) {
+            const loader1 = UI.loader("Server creation...");
+            await Git.initServer(serverName);
+            loader1.stop();
+
+            const { value } = await UI.input({
+              title: `${color("[3/3]:", "info")} Server creation...`,
+              desc: "Path to existing world folder, or press Enter to skip",
+              allowEmpty: true,
+              validate: (p) => p && !existsSync(p) ? "Path does not exist" : null,
+            });
+
+            const config = await App.getConfig(CONFIG_FILE);
+            const instances = (config["instances"] as Instance[]) ?? [];
+            const inst = instances.find(i => i.name === serverName);
+            if (inst) inst.ready = "done";
+            await App.putConfig(CONFIG_FILE, { instances });
+
+            step = 4;
+          }
         }
 
-        if (step < 2) continue;
+        if (step < 3) continue;
         break;
       }
 
       if (value === "= Choose Server") {
         const config = await App.getConfig(CONFIG_FILE);
-        const instances = ((config["instances"] as Instance[]) ?? []).filter(i => i.name !== basename(App.PENDING_DIR));
+        const instances = ((config["instances"] as Instance[]) ?? []);
         if (instances.length === 0) continue;
 
         const { value, cancelled } = await UI.list(
