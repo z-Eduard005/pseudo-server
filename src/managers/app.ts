@@ -31,6 +31,7 @@ export type Instance = {
   owner: string;
   ready: "init" | "installed" | "done";
   version: string;
+  repoUrl?: string;
 }
 
 export default class App {

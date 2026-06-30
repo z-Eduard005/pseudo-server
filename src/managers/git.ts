@@ -1,7 +1,9 @@
-import { mkdir, rm, writeFile } from "fs/promises";
+import { readFile, rm, writeFile } from "fs/promises";
 import { exists, randomNum, run, log, tryCatch } from "../utils";
-import { USER_NAME, INSTANCES_DIR } from "../constants";
+import { USER_NAME, INSTANCES_DIR, CONFIG_FILE } from "../constants";
 import { join } from "path";
+import GH from "./gh";
+import App, { type Instance } from "./app";
 
 export default class Git {
   private static readonly PUSH_INTERVAL_MS = 30 * 60 * 1000;
@@ -12,19 +14,44 @@ export default class Git {
 
   static async initServer(serverName: string) {
     const serverDir = join(INSTANCES_DIR, serverName, "server");
+    const deployKeyPath = join(INSTANCES_DIR, serverName, "deploy_key");
 
     await tryCatch(async () => {
       // 0: remove previous failures
       await rm(join(serverDir, ".git"), { recursive: true, force: true });
       // 1: add to gitignore
-      await writeFile(join(serverDir, ".gitignore"), "/world/\n",);
-      // 2: git init for server dir on branch "server" 
-      // TODO 
-      // 3: create repo with gh for server dir and save token to config
-      // TODO
-      // 4: push server dir with token
-      // TODO
+      await writeFile(join(serverDir, ".gitignore"), "/world/\n");
+      // 2: git init for server dir on branch "server"
+      await run("git init -b server", { cwd: serverDir });
 
+      // Generate SSH deploy key pair
+      await rm(deployKeyPath, { force: true });
+      await rm(deployKeyPath + ".pub", { force: true });
+      await run(`ssh-keygen -t ed25519 -N "" -f "${deployKeyPath}"`);
+
+      // 3: create repo with gh and save to config
+      const repoUrl = await GH.repoCreate(serverName);
+      const pubKey = await readFile(deployKeyPath + ".pub", "utf8");
+      await GH.addDeployKey(serverName, pubKey.trim());
+
+      // Set up remote + SSH config + commit init
+      await run(
+        [
+          `git remote add origin ${repoUrl}`,
+          `git config core.sshCommand "ssh -i ${deployKeyPath}"`,
+          "git add -A",
+          'git commit -m "init"'
+        ],
+        { cwd: serverDir }
+      );
+      await run("git push --force origin server", { cwd: serverDir, inherit: true });
+
+      // Save repoUrl to instance config
+      const config = await App.getConfig(CONFIG_FILE);
+      const instances = (config["instances"] as Instance[]) ?? [];
+      const inst = instances.find(i => i.name === serverName);
+      if (inst) inst.repoUrl = repoUrl;
+      await App.putConfig(CONFIG_FILE, { instances });
     }, "Error during server directory initialization");
   }
 
@@ -106,38 +133,11 @@ export default class Git {
     }, "Failed world synchronization");
   };
 
-  private static async serverDirSetup(repoUrl: string, deployKeyPath: string) {
-    await run(
-      [
-        "git init -b server",
-        `git remote add origin ${repoUrl}`,
-        `git config core.sshCommand "ssh -i ${deployKeyPath}"`,
-      ],
-      { inherit: true, cwd: Git.SERVER_DIR }
-    );
-  }
-
-  static async serverInit(repoUrl: string, deployKeyPath: string) {
-    await tryCatch(async () => {
-      await mkdir(Git.SERVER_DIR, { recursive: true });
-      await Git.serverDirSetup(repoUrl, deployKeyPath);
-      await run(
-        [
-          "git add -A",
-          'git commit -m "init"',
-          "git push --force origin server",
-        ],
-        { inherit: true, cwd: Git.SERVER_DIR }
-      );
-    }, "Failed to initialize server repository");
-  }
-
   static async serverFetch(repoUrl: string, deployKeyPath: string) {
     log("Server synchronization...", "info");
     await tryCatch(async () => {
       if (!(await exists(Git.SERVER_DIR))) {
-        await mkdir(Git.SERVER_DIR, { recursive: true });
-        await Git.serverDirSetup(repoUrl, deployKeyPath);
+        // TODO
       }
       await run(
         [

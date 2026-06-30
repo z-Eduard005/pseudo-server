@@ -9,7 +9,6 @@ import Process from "./managers/process";
 import Hosting from "./managers/hosting";
 import App, { type Instance } from "./managers/app";
 import { CONFIG_FILE } from "./constants";
-import { basename } from "path";
 
 tryCatch(
   async () => {
@@ -128,9 +127,9 @@ tryCatch(
             step = 3;
           }
           if (step === 3) {
-            const loader1 = UI.loader("Server creation...");
+            UI.restoreMainScreen();
+            log("Server creation...", "info");
             await Git.initServer(serverName);
-            loader1.stop();
 
             const { value } = await UI.input({
               title: `${color("[3/3]:", "info")} Server creation...`,

@@ -70,7 +70,16 @@ export default class GH {
     }, "Git initialization failed");
   }
 
+  static async repoDelete(name: string): Promise<void> {
+    await tryCatch(
+      () => run(`gh repo delete "${name}" --yes`, { inherit: true }),
+      `Failed to delete stale repository "${name}"`,
+      true
+    );
+  }
+
   static async repoCreate(name: string): Promise<string> {
+    await GH.repoDelete(name);
     await tryCatch(
       () => run(`gh repo create "${name}" --private`, { inherit: true }),
       `Failed to create repository "${name}"`
@@ -83,7 +92,7 @@ export default class GH {
     GH.owner = await tryCatch(
       () => run('gh api user --jq ".login"'),
       "Failed to get GitHub username"
-    ) as string;
+    );
     return GH.owner;
   }
 
