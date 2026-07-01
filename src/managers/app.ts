@@ -9,6 +9,7 @@ import {
   APP_DIR,
   INSTANCES_DIR,
   CONFIG_FILE,
+  VERSIONS_DIR,
 } from "../constants";
 import { run, retryRun, log, throwErr, tryCatch, exists } from "../utils";
 import Zerotier from "./zerotier";
@@ -29,13 +30,14 @@ type GithubRelease = {
 export type Instance = {
   name: string;
   owner: string;
-  ready: "init" | "installed" | "done";
+  state: "init" | "installed" | "ready";
   version: string;
   repoUrl?: string;
+  inviteString?: string;
 }
 
 export default class App {
-  private static readonly VERSION = "0.0.26";
+  private static readonly VERSION = "0.0.27";
   private static readonly RELEASE_URL = "https://api.github.com/repos/z-Eduard005/pseudo-server/releases/latest"
   private static readonly RAW_GITHUB_URL = "https://raw.githubusercontent.com/z-Eduard005/pseudo-server/main";
   private static readonly FILE = join(APP_DIR, IS_WIN32 ? APP_NAME + ".exe" : APP_NAME);
@@ -158,6 +160,23 @@ export default class App {
     }, "Failed to update the program");
   }
 
+  private static async cleanInstances() {
+    const config = await App.getConfig(CONFIG_FILE);
+    const instances = (config["instances"] as Instance[]) ?? [];
+    const filtered = [];
+
+    for (const inst of instances) {
+      if (await exists(join(INSTANCES_DIR, inst.name))) {
+        filtered.push(inst);
+      } else {
+        await rm(join(VERSIONS_DIR, inst.name), { recursive: true, force: true });
+      }
+    }
+    if (filtered.length !== instances.length) {
+      await App.putConfig(CONFIG_FILE, { instances: filtered });
+    }
+  }
+
   static async setup() {
     await mkdir(APP_DIR, { recursive: true });
     log(`${APP_NAME} v${App.VERSION}`, "info")
@@ -184,6 +203,7 @@ export default class App {
     }
 
     await App.checkUpdates();
+    await App.cleanInstances();
   }
 
   static async initInstance(serverName: string, serverVersion: string) {
@@ -194,7 +214,59 @@ export default class App {
 
     const config = await App.getConfig(CONFIG_FILE);
     const instances = (config["instances"] as Instance[]) ?? [];
-    instances.push({ name: serverName, owner: "me", ready: "init", version: serverVersion });
+    instances.push({ name: serverName, owner: "me", state: "init", version: serverVersion });
     await App.putConfig(CONFIG_FILE, { instances });
+  }
+
+  static async updateInstance(name: string, patch: Partial<Instance>): Promise<void> {
+    const config = await App.getConfig(CONFIG_FILE);
+    const instances = (config["instances"] as Instance[]) ?? [];
+    const inst = instances.find(i => i.name === name);
+    if (inst) Object.assign(inst, patch);
+    await App.putConfig(CONFIG_FILE, { instances });
+  }
+
+  static async generateInviteString(serverName: string): Promise<string> {
+    const config = await App.getConfig(CONFIG_FILE);
+    const networkId = config["zerotierID"] as string;
+
+    const instances = (config["instances"] as Instance[]) ?? [];
+    const instance = instances.find(i => i.name === serverName);
+    if (!instance) throwErr(`Instance "${serverName}" not found`);
+
+    const nickName = await Tlauncher.getAccountName();
+    const ztIp = Zerotier.ip;
+    if (!ztIp) throwErr("Error: Your ZeroTier IP not found");
+
+    const deployKeyPath = join(INSTANCES_DIR, serverName, "deploy_key");
+    const privateKey = await readFile(deployKeyPath, "utf8");
+
+    const repoUrl = instance!.repoUrl;
+    const mcVersion = instance!.version;
+    if (!repoUrl) throwErr(`Error: Missing "repoUrl" for instance "${serverName}"`);
+    if (!mcVersion) throwErr(`Error: Missing "version" for instance "${serverName}"`);
+
+    const data = {
+      networkId,
+      nickName,
+      ztIp,
+      serverName,
+      privateKey,
+      repoUrl,
+      mcVersion,
+    };
+
+    return Buffer.from(JSON.stringify(data)).toString("base64");
+  }
+
+  static async copyToClipboard(text: string) {
+    await tryCatch(async () => {
+      if (IS_WIN32) {
+        await run(`echo ${text} | clip`);
+      } else {
+        await run(`wl-copy "${text}"`);
+      }
+      log("Copied to clipboard", "success");
+    }, "Failed to copy to clipboard", true);
   }
 }

@@ -1,13 +1,12 @@
 import { readFile, writeFile, readdir, cp, rename, rm } from "fs/promises";
 import { exists, run, log, throwErr, tryCatch } from "../utils"
 import { join, extname } from "path";
-import { IS_WIN32, MC_DIR } from "../constants";
+import { IS_WIN32, MC_DIR, VERSIONS_DIR } from "../constants";
 import Java from "./java";
 import UI from "./ui";
 import { spawn } from "child_process";
 
 export default class Tlauncher {
-  static readonly VERSIONS_DIR = join(MC_DIR, "game", "versions");
   private static readonly PROPS_FILE = join(MC_DIR, "tl.properties");
   private static readonly PROPS_VERSION_ENTRY = "pseudo-server=V1";
   private static readonly FILENAME = IS_WIN32 ? "LL.exe" : "LL.sh";
@@ -88,6 +87,16 @@ export default class Tlauncher {
     }, err);
   }
 
+  static async getAccountName(): Promise<string> {
+    return await tryCatch(async () => {
+      const content = await readFile(Tlauncher.PROPS_FILE, "utf8");
+      const match = content.match(/^login\.account=(.+)$/m);
+
+      if (!match) throwErr("Account not found in TLauncher settings");
+      return match![1]!.trim();
+    }, "Failed to read TLauncher account name");
+  }
+
   static async open() {
     await tryCatch(
       async () => {
@@ -130,9 +139,9 @@ export default class Tlauncher {
 
   static async installedVersions(excludeNames: string[] = []): Promise<string[]> {
     return await tryCatch(async () => {
-      const entries = await readdir(Tlauncher.VERSIONS_DIR, { withFileTypes: true });
+      const entries = await readdir(VERSIONS_DIR, { withFileTypes: true });
       const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).filter(d => !excludeNames.includes(d));
-      const hasJar = await Promise.all(dirs.map(d => exists(join(Tlauncher.VERSIONS_DIR, d, `${d}.jar`))));
+      const hasJar = await Promise.all(dirs.map(d => exists(join(VERSIONS_DIR, d, `${d}.jar`))));
       return dirs.filter((_, i) => hasJar[i]).sort();
     }, "Failed to read installed versions");
   }
@@ -140,8 +149,8 @@ export default class Tlauncher {
   static async setupServerVersion(sourceVersion: string, serverName: string) {
     const loader = UI.loader("Setting up server version...");
     await tryCatch(async () => {
-      const srcDir = join(Tlauncher.VERSIONS_DIR, sourceVersion);
-      const dstDir = join(Tlauncher.VERSIONS_DIR, serverName);
+      const srcDir = join(VERSIONS_DIR, sourceVersion);
+      const dstDir = join(VERSIONS_DIR, serverName);
 
       await rm(dstDir, { recursive: true, force: true });
       await cp(srcDir, dstDir, { recursive: true });

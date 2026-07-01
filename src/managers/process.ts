@@ -112,7 +112,7 @@ export default class Process {
 
     if (Hosting.ip === Zerotier.ip && Git.worldInitialized) {
       await tryCatch(
-        () => Git.worldSync(),
+        () => Git.syncWorld(),
         err => log(err, "error")
       );
     }

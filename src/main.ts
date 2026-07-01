@@ -8,7 +8,8 @@ import Tlauncher from "./managers/tlauncher";
 import Process from "./managers/process";
 import Hosting from "./managers/hosting";
 import App, { type Instance } from "./managers/app";
-import { CONFIG_FILE } from "./constants";
+import { CONFIG_FILE, GAME_DIR } from "./constants";
+import { join } from "path";
 
 tryCatch(
   async () => {
@@ -16,6 +17,54 @@ tryCatch(
     await App.setup();
 
     let mainOptionIndex = 0;
+    Zerotier.ip = Zerotier.getIP();
+
+    const runInstance = async () => {
+      UI.restoreMainScreen();
+
+      Java.getRam();
+
+      await Tlauncher.checkAccountType();
+
+      await Zerotier.start();
+      await Zerotier.join("TEST");
+
+      await Tlauncher.chooseVersion("TEST");
+      await Tlauncher.open();
+
+      await Hosting.startMonitoring();
+
+      // await Git.worldInit();
+
+      await Java.generateServerSettings(Zerotier.ip!, "TEST");
+      await Java.start("TEST");
+
+      Java.process?.on("error", async (err) => {
+        throwErr(`Error starting Java server. Check path to Java: ${Java.getJavaPath("TEST")}\n${err}`);
+      });
+      Java.process?.on("close", async (code) => {
+        if (code !== 0) {
+          throwErr(`Server terminated with an error (code: ${code})`);
+        }
+        await Process.stop("Server successfully stopped");
+      });
+      Java.process?.stdout.on("data", async (data) => {
+        process.stdout.write(data);
+
+        const ADMIN_NAME = "TEST";
+
+        if (data.includes(`${ADMIN_NAME} joined the game`)) {
+          Java.runMCCommand(`op ${ADMIN_NAME}`);
+        }
+
+        if (data.includes("Unloading dimension 1")) {
+          log(`You have started the server on port: ${Zerotier.ip}:${Java.PORT}\nHave fun playing :)`, "success");
+
+          Git.worldEnableRepeatedPush();
+        }
+      });
+    };
+
     const settingsAction = async () => {
       while (true) {
         const { value, cancelled } = await UI.list(
@@ -118,11 +167,7 @@ tryCatch(
             await App.initInstance(serverName, serverVersion);
             await Java.installServer(serverName, serverVersion);
 
-            const config = await App.getConfig(CONFIG_FILE);
-            const instances = (config["instances"] as Instance[]) ?? [];
-            const inst = instances.find(i => i.name === serverName);
-            if (inst) inst.ready = "installed";
-            await App.putConfig(CONFIG_FILE, { instances });
+            await App.updateInstance(serverName, { state: "installed" });
 
             step = 3;
           }
@@ -138,20 +183,37 @@ tryCatch(
               validate: (p) => p && !existsSync(p) ? "Path does not exist" : null,
             });
 
-            await Git.initWorld(serverName);
-
-            const config = await App.getConfig(CONFIG_FILE);
-            const instances = (config["instances"] as Instance[]) ?? [];
-            const inst = instances.find(i => i.name === serverName);
-            if (inst) inst.ready = "done";
-            await App.putConfig(CONFIG_FILE, { instances });
+            await Git.initWorld(serverName, value);
+            const invite = await App.generateInviteString(serverName);
+            await App.updateInstance(serverName, { state: "ready", inviteString: invite });
 
             step = 4;
           }
         }
+        if (step === 4) {
+          let launch = false;
+          while (true) {
+            const { value, cancelled } = await UI.list(
+              ["Copy Invite string", "Launch Instance", "Back to Main Menu"],
+              {
+                title: `Server Instance "${serverName}" created`,
+                desc: `\nYou can add mods and configs by just placing them in: ${join(GAME_DIR, "home", serverName)}`
+              }
+            );
+            if (cancelled || value === "Back to Main Menu") break;
+            if (value === "Copy Invite string") {
+              const config = await App.getConfig(CONFIG_FILE);
+              const instances = (config["instances"] as Instance[]) ?? [];
+              const inst = instances.find(i => i.name === serverName);
+              if (inst?.inviteString) await App.copyToClipboard(inst.inviteString);
+            }
+            if (value === "Launch Instance") { launch = true; break; }
+          }
+          if (launch) break;
+          continue;
+        }
 
-        if (step < 3) continue;
-        break;
+        if (step < 4) continue;
       }
 
       if (value === "= Choose Server") {
@@ -162,7 +224,7 @@ tryCatch(
         const { value, cancelled } = await UI.list(
           instances.map(i => {
             const item: ListItem = { label: i.name };
-            if (i.ready !== "done") {
+            if (i.state !== "ready") {
               item.badge = "Not Ready";
             } else if (i.owner === "me") {
               item.badge = "★";
@@ -182,50 +244,8 @@ tryCatch(
       }
       if (value === "+ Add New Server (Connect)") continue;
     }
-    UI.restoreMainScreen();
 
-    Java.getRam();
-
-    await Tlauncher.checkAccountType();
-
-    await Zerotier.start();
-    await Zerotier.join("TEST");
-    Zerotier.getIP();
-
-    await Tlauncher.chooseVersion("TEST");
-    await Tlauncher.open();
-
-    await Hosting.startMonitoring();
-
-    await Git.worldInit();
-
-    await Java.generateServerSettings(Zerotier.ip!, "TEST");
-    await Java.start("TEST");
-
-    Java.process?.on("error", async (err) => {
-      throwErr(`Error starting Java server. Check path to Java: ${Java.getJavaPath("TEST")}\n${err}`);
-    });
-    Java.process?.on("close", async (code) => {
-      if (code !== 0) {
-        throwErr(`Server terminated with an error (code: ${code})`);
-      }
-      await Process.stop("Server successfully stopped");
-    });
-    Java.process?.stdout.on("data", async (data) => {
-      process.stdout.write(data);
-
-      const ADMIN_NAME = "TEST";
-
-      if (data.includes(`${ADMIN_NAME} joined the game`)) {
-        Java.runMCCommand(`op ${ADMIN_NAME}`);
-      }
-
-      if (data.includes("Unloading dimension 1")) {
-        log(`You have started the server on port: ${Zerotier.ip}:${Java.PORT}\nHave fun playing :)`, "success");
-
-        Git.worldEnableRepeatedPush();
-      }
-    });
+    await runInstance();
   },
   async (err) => {
     UI.restoreMainScreen();

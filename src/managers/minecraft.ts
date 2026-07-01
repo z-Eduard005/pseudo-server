@@ -1,7 +1,7 @@
 import { join } from "path";
 import { tryCatch } from "../utils";
 import { rm, writeFile } from "fs/promises";
-import Tlauncher from "./tlauncher";
+import { VERSIONS_DIR } from "../constants";
 
 export default class Minecraft {
   private static serverToNBT(ip: string, name: string) {
@@ -46,8 +46,8 @@ export default class Minecraft {
   };
 
   static addServer(ip: string, name: string) {
-    const serversBakFile = join(Tlauncher.VERSIONS_DIR, name, "servers.dat.bak");
-    const serversFile = join(Tlauncher.VERSIONS_DIR, name, "servers.dat");
+    const serversBakFile = join(VERSIONS_DIR, name, "servers.dat.bak");
+    const serversFile = join(VERSIONS_DIR, name, "servers.dat");
 
     tryCatch(
       async () => {

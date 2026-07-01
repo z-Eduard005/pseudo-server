@@ -1,5 +1,5 @@
-import { readFile, rm, writeFile } from "fs/promises";
-import { exists, randomNum, run, log, tryCatch } from "../utils";
+import { cp, mkdir, readFile, rename, rm, writeFile } from "fs/promises";
+import { exists, randomNum, run, log, tryCatch, throwErr } from "../utils";
 import { USER_NAME, INSTANCES_DIR, CONFIG_FILE } from "../constants";
 import { join } from "path";
 import GH from "./gh";
@@ -18,11 +18,8 @@ export default class Git {
     const posixPath = deployKeyPath.replace(/\\/g, "/");
 
     await tryCatch(async () => {
-      // 0: remove previous failures
       await rm(join(serverDir, ".git"), { recursive: true, force: true });
-      // 1: add to gitignore
       await writeFile(join(serverDir, ".gitignore"), "/world/\n");
-      // 2: git init for server dir on branch "server"
       await run("git init -b server", { cwd: serverDir });
 
       // Generate SSH deploy key pair
@@ -30,68 +27,81 @@ export default class Git {
       await rm(deployKeyPath + ".pub", { force: true });
       await run(`ssh-keygen -t ed25519 -N "" -f "${posixPath}"`);
 
-      // 3: create repo with gh and save to config
+      // Create repo with gh and save to config
       const repoUrl = await GH.repoCreate(serverName);
       const pubKey = await readFile(deployKeyPath + ".pub", "utf8");
       await GH.addDeployKey(serverName, pubKey.trim());
 
       // Set up remote + commit init
+      process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
       await run(
         [
           `git remote add origin ${repoUrl}`,
           "git add -A",
-          'git commit -m "init"'
+          'git commit --allow-empty -m "init"',
+          "git push --force origin server"
         ],
-        { cwd: serverDir }
+        { cwd: serverDir, inherit: true }
       );
-      process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
-      await run("git push --force origin server", { cwd: serverDir, inherit: true });
 
       // Save repoUrl to instance config
-      const config = await App.getConfig(CONFIG_FILE);
-      const instances = (config["instances"] as Instance[]) ?? [];
-      const inst = instances.find(i => i.name === serverName);
-      if (inst) inst.repoUrl = repoUrl;
-      await App.putConfig(CONFIG_FILE, { instances });
+      await App.updateInstance(serverName, { repoUrl });
     }, "Error during server directory initialization");
   }
 
-  static async initWorld(serverName: string) {
-    const serverDir = join(INSTANCES_DIR, serverName, "server");
-    const worldDir = join(serverDir, "world");
+  static async initWorld(serverName: string, worldPath?: string) {
+    const worldDir = join(INSTANCES_DIR, serverName, "server", "world");
+    const deployKeyPath = join(INSTANCES_DIR, serverName, "deploy_key");
+    const posixPath = deployKeyPath.replace(/\\/g, "/");
 
     await tryCatch(async () => {
-      // 0: remove previous failures
+      // Get repoUrl from instance config
+      const config = await App.getConfig(CONFIG_FILE);
+      const instances = (config["instances"] as Instance[]) ?? [];
+      const inst = instances.find(i => i.name === serverName);
+      const repoUrl = inst?.repoUrl;
+      if (!repoUrl) throwErr("No server url found. Please create a server first");
+
       await rm(join(worldDir, ".git"), { recursive: true, force: true });
-      // 2: git init for world dir on branch "world" 
-      // TODO 
-      // 3: create repo with gh for world dir and save token to config
-      // TODO
-      // 4: push world dir with token
-      // TODO
 
+      // Create world dir and copy files if path provided
+      await mkdir(worldDir, { recursive: true });
+      if (worldPath) {
+        let invalidPath = true;
 
+        const levelDatPath = join(worldPath, "level.dat");
+        const regionDirPath = join(worldPath, "region");
+        if (await exists(levelDatPath) && await exists(regionDirPath)) {
+          invalidPath = false;
+        }
 
+        if (invalidPath) {
+          log("Invalid world folder", "warning");
+        } else {
+          await rename(worldDir, worldDir + ".bak");
+          await cp(worldPath, worldDir, { recursive: true, force: true });
+        }
+      }
 
-      // BACKUP: DONT DELETE
-      // log("World initialization...", "info");
-      // await mkdir(worldDir, { recursive: true });
-      // await run(
-      //   [
-      //     "git init -b world",
-      //     "git config --add safe.directory .",
-      //     `git -c credential.helper= fetch --depth 1 ${Git.REPO_URL} world`,
-      //     "git reset --hard FETCH_HEAD",
-      //   ],
-      //   { inherit: true, cwd: worldDir }
-      // );
-      // Git.worldInitialized = true;
+      // Git init for world dir on branch "world" + push first commit to world branch
+      process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
+      await run(
+        [
+          "git init -b world",
+          `git remote add origin ${repoUrl}`,
+          "git add -A",
+          'git commit --allow-empty -m "init"',
+          "git push --force origin world"
+        ],
+        { cwd: worldDir, inherit: true }
+      );
+
     }, "Error during world directory initialization");
   }
 
   static worldEnableRepeatedPush() {
     Git.nodeWorldPushInterval = setInterval(async () => {
-      await Git.worldPush();
+      await Git.pushWorld();
       log("The world has been sent to the cloud", "warning");
     }, Git.PUSH_INTERVAL_MS);
   }
@@ -100,7 +110,7 @@ export default class Git {
     clearInterval(Git.nodeWorldPushInterval)
   }
 
-  static async worldPush() {
+  static async pushWorld() {
     await tryCatch(async () => {
       await run(
         [
@@ -113,7 +123,7 @@ export default class Git {
     }, "Error sending world to the cloud (check your internet)");
   };
 
-  static async worldSync() {
+  static async syncWorld() {
     log("World synchronization...", "info");
     await tryCatch(async () => {
       await run(`git -c credential.helper= fetch --depth 1 ${Git.REPO_URL}`, {
@@ -127,14 +137,14 @@ export default class Git {
       );
 
       if (unstagedChanges.length !== 0 && localHead === remoteHead) {
-        await Git.worldPush();
+        await Git.pushWorld();
       } else {
         await run("git reset --hard FETCH_HEAD", { inherit: true, cwd: Git.WORLD_DIR });
       }
     }, "Failed world synchronization");
   };
 
-  static async serverFetch(repoUrl: string, deployKeyPath: string) {
+  static async fetchServer(_repoUrl: string, deployKeyPath: string) {
     log("Server synchronization...", "info");
     await tryCatch(async () => {
       const posixPath = deployKeyPath.replace(/\\/g, "/");
@@ -152,7 +162,7 @@ export default class Git {
     }, "Failed server synchronization");
   }
 
-  static async serverPush(_repoUrl: string, deployKeyPath: string) {
+  static async pushServer(_repoUrl: string, deployKeyPath: string) {
     const posixPath = deployKeyPath.replace(/\\/g, "/");
     await tryCatch(async () => {
       process.env['GIT_SSH_COMMAND'] = `ssh -o StrictHostKeyChecking=accept-new -i ${posixPath}`;
@@ -165,12 +175,5 @@ export default class Git {
         { inherit: true, cwd: Git.SERVER_DIR }
       );
     }, "Failed to push server updates");
-  }
-
-  static async serverDetectDirty() {
-    return await tryCatch(async () => {
-      const status = await run("git status --porcelain", { cwd: Git.SERVER_DIR });
-      return status.trim().length > 0;
-    }, "Failed to check server status");
   }
 }

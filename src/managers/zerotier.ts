@@ -76,20 +76,19 @@ export default class Zerotier {
   }
 
   static getIP() {
-    Zerotier.ip =
-      Object.values(networkInterfaces())
-        .flat()
-        .find(
-          (interf) => {
-            return interf?.family === "IPv4" &&
-              !interf.internal &&
-              interf.address.startsWith(Zerotier.START_IP);
-          }
-        )?.address ?? "";
-    if (!Zerotier.ip)
+    const ip = Object.values(networkInterfaces()).flat().find(
+      (interf) => {
+        return interf?.family === "IPv4" &&
+          !interf.internal &&
+          interf.address.startsWith(Zerotier.START_IP);
+      }
+    )?.address ?? "";
+    if (!ip) {
       throwErr(
         "Zerotier ipV4 address of this device not found (try to restart the pc)"
       );
+    }
+    return ip;
   }
 
   static async install() {
